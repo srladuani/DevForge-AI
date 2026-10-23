@@ -49,4 +49,11 @@ public final class RunViews {
      * traceable pull-request description. Nothing is pushed anywhere.
      */
     public record ExportView(UUID runId, String branchName, String prDescription, List<ExportRepoView> repositories, List<String> warnings, boolean blocked) {}
+
+    /** A change on its way to a Git host. The credential is never part of it. */
+    public record PublicationView(UUID changeId, String repoName, String status, String remote, String branch, String baseBranch, @Nullable String commitSha, @Nullable Integer prNumber,
+                                  @Nullable String prUrl, @Nullable String failureCode, @Nullable String failureMessage) {}
+
+    /** Publishing needs a person's approval of exactly this plan; {@code approvalId} is the request waiting for them. */
+    public record PublishRequested(UUID approvalId, String branch, String planHash) {}
 }

@@ -29,8 +29,27 @@ class ScratchCopies implements WorkCopies {
             export(sourceRepo, sha, dir);
             GitProcess.run(dir, "init", "-q");
             GitProcess.run(dir, "add", "-A");
-            var commit = GitProcess.run(dir, "commit", "-q", "--allow-empty", "-m", "baseline " + sha);
+            // fixed dates: the same export always gives the same baseline commit
+            var commit = GitProcess.runWithInput(dir, null, java.util.Map.of("GIT_AUTHOR_DATE", "946684800 +0000", "GIT_COMMITTER_DATE", "946684800 +0000"), "commit", "-q", "--allow-empty", "-m", "baseline " + sha);
             if (commit.exit() != 0) throw new EditRejected("EXPORT_FAILED", "Could not record the baseline");
+            return new GitWorkCopy(dir);
+        } catch (IOException | RuntimeException e) {
+            if (dir != null) GitWorkCopy.deleteTree(dir);
+            if (e instanceof EditRejected r) throw r;
+            throw new EditRejected("EXPORT_FAILED", "Could not prepare a working copy of the repository");
+        }
+    }
+
+    @Override
+    public WorkCopy openWithHistory(String label, Path sourceRepo, String sha) {
+        if (!sha.matches("[0-9a-f]{40,64}")) throw new EditRejected("EXPORT_FAILED", "Not a commit id");
+        Path dir = null;
+        try {
+            Files.createDirectories(root);
+            dir = Files.createTempDirectory(root, label.replaceAll("[^A-Za-z0-9._-]", "_") + "-");
+            if (GitProcess.run(dir, "clone", "-q", "--no-checkout", "--no-hardlinks", "--", sourceRepo.toString(), dir.toString()).exit() != 0) throw new EditRejected("EXPORT_FAILED", "Could not read the repository");
+            if (GitProcess.run(dir, "checkout", "-q", "--detach", sha).exit() != 0) throw new EditRejected("EXPORT_FAILED", "The pinned commit is not in the repository");
+            GitProcess.run(dir, "remote", "remove", "origin");
             return new GitWorkCopy(dir);
         } catch (IOException | RuntimeException e) {
             if (dir != null) GitWorkCopy.deleteTree(dir);

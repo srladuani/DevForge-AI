@@ -45,6 +45,34 @@ public interface WorkCopy extends AutoCloseable {
      */
     void applyPatch(String patch, Set<String> approvedProtected);
 
+    /**
+     * Records everything changed since the export as one commit, authored and committed by the given person, with a fixed timestamp so the same
+     * input always yields the same commit id (a retried publication then pushes an identical commit).
+     *
+     * @return the commit id
+     */
+    String commit(String message, String authorName, String authorEmail, java.time.Instant when);
+
+    /**
+     * Pushes HEAD to {@code refs/heads/<branch>} of {@code remoteUrl}. Never forced: a branch that exists with different history is refused.
+     * The credential travels only in the git process's environment, never on its command line or in a URL.
+     *
+     * @param authHeader complete HTTP header line such as {@code Authorization: Basic …}, or null for none
+     * @throws PushRejected with a stable code (REJECTED, AUTH, UNREACHABLE)
+     */
+    void push(String remoteUrl, String branch, @org.jspecify.annotations.Nullable String authHeader);
+
+    final class PushRejected extends RuntimeException {
+        private final String code;
+
+        public PushRejected(String code, String message) {
+            super(message);
+            this.code = code;
+        }
+
+        public String code() { return code; }
+    }
+
     /** Everything changed since the export, as a unified diff. */
     Diff diff();
 

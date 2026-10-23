@@ -208,8 +208,11 @@ class RunService {
     /** What this user can do next, so the UI never has to re-implement the rules. Enforcement still happens server-side on every call. */
     static List<String> nextActions(RunRow r, CurrentUser user, WorkspaceRole role) {
         List<String> a = new ArrayList<>();
-        if (role == null || !role.allows(Permission.RUN) || RunStateMachine.isFinal(r.status())) return a;
+        if (role == null || !role.allows(Permission.RUN)) return a;
         boolean owner = r.ownerUserId().equals(user.id());
+        // the owner may ask to publish a real change once it awaits review or has been accepted (an approval by someone else is still required)
+        if (owner && !r.simulated() && (r.status() == RunStatus.AWAITING_REVIEW || r.status() == RunStatus.COMPLETED)) a.add("publish");
+        if (RunStateMachine.isFinal(r.status())) return a;
         switch (r.status()) {
             case AWAITING_INPUT -> {
                 if ("CLARIFICATION".equals(r.awaitReason())) a.add("answer");

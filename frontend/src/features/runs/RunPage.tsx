@@ -95,7 +95,7 @@ export function RunPage() {
         {tab === 'overview' && <OverviewTab run={r} />}
         {tab === 'findings' && <FindingsTab runId={r.id} />}
         {tab === 'proposal' && <ProposalTab runId={r.id} />}
-        {tab === 'changes' && <ChangesTab runId={r.id} exportable={(r.status === 'AWAITING_REVIEW' || r.status === 'COMPLETED') && !r.agent.simulated} />}
+        {tab === 'changes' && <ChangesTab runId={r.id} workspaceId={r.workspaceId} canPublish={r.nextActions.includes('publish')} exportable={(r.status === 'AWAITING_REVIEW' || r.status === 'COMPLETED') && !r.agent.simulated} />}
         {tab === 'approvals' && <ApprovalsTab run={r} canApprove={canApprove} />}
         {tab === 'timeline' && <TimelineTab events={live.events} stream={live.status} />}
       </Tabs>

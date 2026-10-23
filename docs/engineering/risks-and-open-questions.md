@@ -6,7 +6,7 @@
 | Q1 | ~~ProgressiveBeef backend location~~ **Not a product question.** Users supply repo links; ProgressiveBeef (Bitbucket, Gradle build) is only a possible test fixture. | Synthetic fixture repos (Gradle Spring + Maven Spring + React webpack + React Vite) | M1 fixtures |
 | Q2 | Which Jira MCP server (Atlassian remote MCP w/ OAuth, or self-hosted)? How will the backend authenticate non-interactively? | Spike M0-S2 decides | M3 |
 | Q3 | ~~Deployment model~~ **Decided:** one organisation per deployment; sessions are single-user, AI credentials per user (ADR-0012). Still open: is company SSO (OIDC) available? | OIDC-ready; local-user dev profile | M1.3 |
-| Q4 | ~~Git host~~ **Decided: open/pluggable.** Auth = API key/PAT first, OAuth second. Remaining: which host adapter ships first (Bitbucket Cloud likely, given the first test project) and which token types that host currently supports (verify in spike S5; vendor auth options change) | PAT adapter for the first host | M5 |
+| Q4 | ~~Git host~~ **Decided: open/pluggable.** Auth = API key/PAT first, OAuth second. **Update 2026-10-23: GitHub chosen as the first host (PAT); built and tested against a fake API.** Remaining: verify against github.com (token permission model), then OAuth and further hosts | PAT adapter for the first host | M5 |
 | Q5 | Which AI providers/models may the organisation use with its source code; retention terms? | Users bring own keys for Claude/OpenAI/Gemini; workspace allowlist policy; code excerpts only | M2 |
 | Q11 | ~~First provider~~ **Decided: Claude first**; OpenAI and Gemini added later; providers configurable from settings or code (ADR-0013). Still to confirm per vendor: terms for API-key use in this product | Claude via API key | M2 |
 | Q6 | Can golden Jira tickets/bugs be sanitized for evals? | Synthetic fixtures + a few manual cases | M2.5 |
@@ -16,7 +16,7 @@
 | Q9 | Does the team want GitHub PR support soon? | Later, via the same port | — |
 
 ## Needed from you to complete M0
-1. An AI provider key (Claude) for a live S1/S4 run, or agree to defer live validation to M2. 2. Docker group access for the real container sandbox. 3. Headless Jira auth approach (R19). 4. Git host (Q4).
+1. An AI provider key (Claude) for a live S1/S4 run, or agree to defer live validation to M2. 2. Docker group access for the real container sandbox. 3. Headless Jira auth approach (R19). 4. ~~Git host (Q4)~~ decided: GitHub; a real GitHub token and a scratch repository are needed to verify publishing for real.
 
 ## Assumptions
 A1-A5 (see `phase-1-requirements.md`). A6: Linux host with Docker available to the backend user. A7: Target repos' tests can run without production services (otherwise validation is limited and reported as such). A9-A10: see `phase-1-requirements.md`. A8: `fisrt-prompt.txt` is the authoritative product brief; filename typo left unchanged.

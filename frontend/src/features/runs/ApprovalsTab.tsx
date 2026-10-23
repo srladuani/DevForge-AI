@@ -29,6 +29,31 @@ function parseSummary(s: string): { filesToChange: string[]; commands: string[];
   return out
 }
 
+type PublishSummary = { branch: string; title: string; draft: boolean; host: string; repositories: Array<{ repository: string; remote: string; base: string; files: string[] }> }
+
+function parsePublishSummary(s: string): PublishSummary | null {
+  try {
+    const v: unknown = JSON.parse(s)
+    if (typeof v !== 'object' || v === null) return null
+    const o = v as Record<string, unknown>
+    const repos = Array.isArray(o.repositories) ? o.repositories : []
+    const strs = (x: unknown) => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string') : [])
+    return {
+      branch: typeof o.branch === 'string' ? o.branch : '',
+      title: typeof o.title === 'string' ? o.title : '',
+      draft: o.draft === true,
+      host: typeof o.host === 'string' ? o.host : '',
+      repositories: repos.flatMap((r: unknown) => {
+        if (typeof r !== 'object' || r === null) return []
+        const x = r as Record<string, unknown>
+        return [{ repository: String(x.repository ?? ''), remote: String(x.remote ?? ''), base: String(x.base ?? ''), files: strs(x.files) }]
+      }),
+    }
+  } catch {
+    return null
+  }
+}
+
 export function ApprovalsTab({ run, canApprove }: { run: Run; canApprove: boolean }) {
   const { data, isPending, error } = useApprovals(run.workspaceId, run.id)
   if (isPending) return <Spinner label="Loading approvals" />
@@ -46,6 +71,7 @@ function PendingApproval({ approval, run, canApprove }: { approval: Approval; ru
   const decide = useDecide(run.id)
   const [comment, setComment] = useState('')
   const s = parseSummary(approval.summary)
+  const publish = approval.kind === 'PR' ? parsePublishSummary(approval.summary) : null
   const err = decide.error
   const stale = err instanceof ApiError && err.code === 'ARTIFACT_CHANGED'
 
@@ -53,14 +79,38 @@ function PendingApproval({ approval, run, canApprove }: { approval: Approval; ru
     <Card className="border-warn">
       <CardHeader title="Your decision is needed" subtitle={`Expires ${new Date(approval.expiresAt).toLocaleString()}`} actions={<Badge tone="warn">Pending</Badge>} />
       <div className="space-y-4 p-4 text-sm">
-        <p>
-          Approving allows this run to <strong>prepare patches</strong> for the files below. Nothing is applied, committed or pushed. This approval is bound to proposal{' '}
-          <span className="font-mono">{shortHash(approval.artifactHash)}</span> and stops counting if the proposal changes.
-        </p>
-        <div>
-          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Files that would change</h3>
-          <ul className="list-disc pl-5 font-mono text-xs">{s.filesToChange.length ? s.filesToChange.map((f) => <li key={f}>{f}</li>) : <li>none listed</li>}</ul>
-        </div>
+        {publish ? (
+          <>
+            <p>
+              Approving lets DevForge <strong>push a new branch</strong> <code className="font-mono text-xs">{publish.branch}</code> and open a <strong>{publish.draft ? 'draft ' : ''}pull request</strong> on {publish.host === 'GITHUB' ? 'GitHub' : publish.host},
+              using the run owner&apos;s own token. Nothing is merged. This approval is bound to plan <span className="font-mono">{shortHash(approval.artifactHash)}</span> and stops counting if anything in it changes.
+            </p>
+            <p>
+              <span className="text-muted">Title:</span> {publish.title}
+            </p>
+            <ul className="space-y-2">
+              {publish.repositories.map((r) => (
+                <li key={r.repository} className="rounded-md bg-surface-2 p-3">
+                  <p>
+                    <strong>{r.repository}</strong> → <span className="font-mono text-xs">{r.remote}</span> (into <span className="font-mono text-xs">{r.base}</span>)
+                  </p>
+                  <ul className="mt-1 list-disc pl-5 font-mono text-xs">{r.files.map((f) => <li key={f}>{f}</li>)}</ul>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <>
+            <p>
+              Approving allows this run to <strong>prepare patches</strong> for the files below. Nothing is applied, committed or pushed. This approval is bound to proposal{' '}
+              <span className="font-mono">{shortHash(approval.artifactHash)}</span> and stops counting if the proposal changes.
+            </p>
+            <div>
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Files that would change</h3>
+              <ul className="list-disc pl-5 font-mono text-xs">{s.filesToChange.length ? s.filesToChange.map((f) => <li key={f}>{f}</li>) : <li>none listed</li>}</ul>
+            </div>
+          </>
+        )}
         {s.commands.length > 0 && (
           <div>
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Commands that would be used to check it</h3>

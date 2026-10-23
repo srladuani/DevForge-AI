@@ -25,7 +25,7 @@ class AdapterRegistry {
         new AdapterType(ConnectionKind.AI_PROVIDER, "OPENAI", "OpenAI", AdapterAvailability.PLANNED, KEY, "https://api.openai.com"),
         new AdapterType(ConnectionKind.AI_PROVIDER, "GEMINI", "Google Gemini", AdapterAvailability.PLANNED, KEY, "https://generativelanguage.googleapis.com"),
         new AdapterType(ConnectionKind.AI_PROVIDER, "OPENAI_COMPATIBLE", "OpenAI-compatible endpoint", AdapterAvailability.PLANNED, KEY, null),
-        new AdapterType(ConnectionKind.GIT_HOST, "GITHUB", "GitHub", AdapterAvailability.PLANNED, TOKEN, "https://github.com"),
+        new AdapterType(ConnectionKind.GIT_HOST, "GITHUB", "GitHub", AdapterAvailability.REAL, List.of(AuthMethod.PAT), "https://api.github.com"),
         new AdapterType(ConnectionKind.GIT_HOST, "BITBUCKET_CLOUD", "Bitbucket Cloud", AdapterAvailability.PLANNED, TOKEN, "https://bitbucket.org"),
         new AdapterType(ConnectionKind.GIT_HOST, "GITLAB", "GitLab", AdapterAvailability.PLANNED, TOKEN, "https://gitlab.com"),
         new AdapterType(ConnectionKind.TRACKER, "JIRA_MCP", "Jira (via MCP)", AdapterAvailability.REAL, List.of(AuthMethod.OAUTH, AuthMethod.PAT, AuthMethod.API_KEY), "https://mcp.atlassian.com/v2/mcp?tools=all"));

@@ -19,6 +19,6 @@ export function useDecide(runId: string) {
   return useMutation({
     mutationFn: (v: { approvalId: string; decision: Decision; artifactHash: string; comment?: string }) =>
       unwrap(client.POST('/api/v1/approvals/{id}/decision', { params: { path: { id: v.approvalId } }, body: { decision: v.decision, artifactHash: v.artifactHash, ...(v.comment ? { comment: v.comment } : {}) } })),
-    onSettled: () => qc.invalidateQueries({ queryKey: runKeys.one(runId) }),
+    onSettled: () => Promise.all([qc.invalidateQueries({ queryKey: runKeys.one(runId) }), qc.invalidateQueries({ queryKey: runKeys.part(runId, 'publications') })]),
   })
 }

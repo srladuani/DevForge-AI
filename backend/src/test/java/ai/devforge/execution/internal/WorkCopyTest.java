@@ -123,4 +123,61 @@ class WorkCopyTest {
         assertThatThrownBy(() -> copy.applyPatch("not a diff at all", Set.of())).isInstanceOf(EditRejected.class);
         assertThat(copy.diff().isEmpty()).isTrue();
     }
+
+    private String publish(WorkCopy c, Path bare, String branch, String message) {
+        String id = c.commit(message, "Dev Owner", "owner@example.test", java.time.Instant.parse("2026-10-23T10:00:00Z"));
+        c.push(bare.toUri().toString(), branch, null);
+        return id;
+    }
+
+    @Test
+    void theSameChangeAlwaysBecomesTheSameCommitSoARetriedPushIsHarmlessAndADifferentOneIsNeverForced() throws IOException {
+        Path bare = tmp.resolve("remote.git");
+        FixtureRepos.git(tmp, "init", "-q", "--bare", bare.toString());
+        copy.edit(BO, "videosFor", "videosForRole", Set.of());
+        String patch = copy.diff().patch();
+        String first = publish(copy, bare, "devforge/x", "Subject\n\nBody\n");
+        assertThat(FixtureRepos.git(bare, "rev-parse", "refs/heads/devforge/x").trim()).isEqualTo(first);
+        assertThat(FixtureRepos.git(bare, "log", "-1", "--format=%an|%ae|%s", "refs/heads/devforge/x").trim()).isEqualTo("Dev Owner|owner@example.test|Subject");
+
+        try (WorkCopy again = new ScratchCopies(tmp.resolve("work").toString()).open("again", source, sha)) {
+            again.applyPatch(patch, Set.of());
+            assertThat(publish(again, bare, "devforge/x", "Subject\n\nBody\n")).as("same input, same commit, push is a no-op").isEqualTo(first);
+        }
+        try (WorkCopy other = new ScratchCopies(tmp.resolve("work").toString()).open("other", source, sha)) {
+            other.edit(BO, "videosFor", "somethingElse", Set.of());
+            assertThatThrownBy(() -> publish(other, bare, "devforge/x", "Different\n")).isInstanceOfSatisfying(WorkCopy.PushRejected.class, e -> assertThat(e.code()).isEqualTo("REJECTED"));
+        }
+        assertThat(FixtureRepos.git(bare, "rev-parse", "refs/heads/devforge/x").trim()).as("the remote branch was not rewritten").isEqualTo(first);
+        assertThatThrownBy(() -> copy.push(bare.toUri().toString(), "--force", null)).isInstanceOf(WorkCopy.PushRejected.class);
+        assertThatThrownBy(() -> copy.push(bare.toUri().toString(), "a..b", null)).isInstanceOf(WorkCopy.PushRejected.class);
+    }
+
+    @Test
+    void anUnreachableRemoteIsReportedWithoutLeakingAnythingFromTheCredentialHeader() {
+        copy.edit(BO, "videosFor", "videosForRole", Set.of());
+        copy.commit("m", "A", "a@example.test", java.time.Instant.parse("2026-10-23T10:00:00Z"));
+        assertThatThrownBy(() -> copy.push(tmp.resolve("missing.git").toUri().toString(), "devforge/y", "Authorization: Basic c2VjcmV0LXRva2Vu"))
+            .isInstanceOfSatisfying(WorkCopy.PushRejected.class, e -> assertThat(e.getMessage()).doesNotContain("c2VjcmV0LXRva2Vu"));
+    }
+
+    @Test
+    void aCopyWithHistoryCommitsOnTheRealBaseCommitSoThePushedBranchIsAnOrdinaryBranch() throws IOException {
+        Path bare = tmp.resolve("remote2.git");
+        FixtureRepos.git(tmp, "init", "-q", "--bare", bare.toString());
+        FixtureRepos.git(source, "push", "-q", bare.toUri().toString(), "HEAD:refs/heads/main");
+        copy.edit(BO, "videosFor", "videosForRole", Set.of());
+        String patch = copy.diff().patch();
+        String before = FixtureRepos.git(source, "status", "--porcelain");
+        try (WorkCopy full = new ScratchCopies(tmp.resolve("work").toString()).openWithHistory("pub", source, sha)) {
+            full.applyPatch(patch, Set.of());
+            String id = full.commit("Subject\n", "Dev", "dev@example.test", java.time.Instant.parse("2026-10-23T10:00:00Z"));
+            full.push(bare.toUri().toString(), "devforge/z", null);
+            assertThat(FixtureRepos.git(bare, "rev-parse", "refs/heads/devforge/z").trim()).isEqualTo(id);
+        }
+        assertThat(FixtureRepos.git(bare, "rev-parse", "refs/heads/devforge/z^").trim()).as("parent is the real base commit").isEqualTo(sha);
+        assertThat(FixtureRepos.git(bare, "rev-list", "--count", "refs/heads/devforge/z").trim()).isEqualTo(FixtureRepos.git(source, "rev-list", "--count", "HEAD").trim().transform(n -> String.valueOf(Integer.parseInt(n) + 1)));
+        assertThat(FixtureRepos.git(source, "status", "--porcelain")).isEqualTo(before);
+        assertThat(FixtureRepos.git(source, "branch", "--list").contains("devforge")).isFalse();
+    }
 }

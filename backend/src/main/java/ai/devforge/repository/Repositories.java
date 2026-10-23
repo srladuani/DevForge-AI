@@ -14,6 +14,9 @@ public interface Repositories {
 
     RepositoryView get(UUID id);
 
+    /** The URL of the checkout's {@code origin} remote, if it has one. Read-only; used to find where a change would be published. */
+    Optional<String> remoteUrl(UUID id);
+
     /** Re-reads HEAD and recomputes the profile. */
     RepositoryView refresh(UUID id);
 }

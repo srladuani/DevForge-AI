@@ -32,8 +32,11 @@ class RunActions {
     private final Connections connections;
     private final AuditLog audit;
     private final TransactionTemplate tx;
+    private final org.springframework.beans.factory.ObjectProvider<PublishService> publishProvider;
 
-    RunActions(RunStore store, RunDataStore data, RunEngine engine, RunService service, WorkspaceAccess access, Connections connections, AuditLog audit, TransactionTemplate tx) {
+    RunActions(RunStore store, RunDataStore data, RunEngine engine, RunService service, WorkspaceAccess access, Connections connections, AuditLog audit, TransactionTemplate tx,
+               org.springframework.beans.factory.ObjectProvider<PublishService> publishProvider) {
+        this.publishProvider = publishProvider;
         this.store = store;
         this.data = data;
         this.engine = engine;
@@ -151,6 +154,10 @@ class RunActions {
      */
     @EventListener
     void onApprovalDecided(ApprovalDecided e) {
+        if (e.kind() == ApprovalKind.PR) {
+            publish().onDecided(e);
+            return;
+        }
         if (e.kind() != ApprovalKind.IMPLEMENT) throw DomainException.conflict("UNSUPPORTED_APPROVAL", "Approvals of kind " + e.kind() + " are not handled yet");
         RunRow run = store.get(e.runId());
         if (run.status() != RunStatus.AWAITING_APPROVAL) throw DomainException.conflict("RUN_NOT_AWAITING_APPROVAL", "The run is " + run.status() + " and no longer waiting for this approval");
@@ -162,6 +169,8 @@ class RunActions {
             throw DomainException.conflict("RUN_CHANGED", "The run changed while the decision was recorded");
         }
     }
+
+    private PublishService publish() { return publishProvider.getObject(); }
 
     // ---- helpers
     private RunRow ownerAction(UUID runId, CurrentUser user) {

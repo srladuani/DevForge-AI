@@ -148,3 +148,35 @@ export async function downloadPatch(runId: string, changeId: string, fileName: s
   link.click()
   URL.revokeObjectURL(url)
 }
+
+export type Publication = Schemas['PublicationView']
+
+export function usePublications(runId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: runKeys.part(runId, 'publications'),
+    enabled: enabled && runId !== '',
+    queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/publications', { params: { path: { id: runId } } })),
+    // a publication runs in the background after approval, so look again while it is unfinished
+    refetchInterval: (q) => (q.state.data?.some((p) => p.status === 'PENDING' || p.status === 'PUSHED') ? 1500 : false),
+  })
+}
+
+/** Asks for approval to push a branch and open a draft pull request. Nothing leaves the platform until someone approves exactly this plan. */
+export function useRequestPublish(runId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => unwrap(client.POST('/api/v1/runs/{id}/publish', { params: { path: { id: runId } } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: runKeys.part(runId, 'approvals') })
+      void qc.invalidateQueries({ queryKey: runKeys.part(runId, 'publications') })
+    },
+  })
+}
+
+export function useRetryPublish(runId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => unwrap(client.POST('/api/v1/runs/{id}/publish/retry', { params: { path: { id: runId } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: runKeys.part(runId, 'publications') }),
+  })
+}

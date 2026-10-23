@@ -59,6 +59,12 @@ class RepositoryStore implements Repositories {
     }
 
     @Override
+    public Optional<String> remoteUrl(UUID id) {
+        String url = git.run(rootOf(id), "config", "--get", "remote.origin.url").text().strip();
+        return url.isEmpty() ? Optional.empty() : Optional.of(url);
+    }
+
+    @Override
     public RepositoryView refresh(UUID id) {
         RepositoryView current = get(id);
         Path root = policy.validateRepoRoot(current.localPath());

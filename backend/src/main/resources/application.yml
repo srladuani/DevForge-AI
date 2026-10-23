@@ -56,3 +56,4 @@ devforge:
       - { kind: AI_PROVIDER, adapter-type: OPENAI, display-name: "OpenAI" }
       - { kind: AI_PROVIDER, adapter-type: GEMINI, display-name: "Gemini (Google)" }
       - { kind: TRACKER, adapter-type: JIRA_MCP, display-name: "Jira (via MCP)" }
+      - { kind: GIT_HOST, adapter-type: GITHUB, display-name: "GitHub" }

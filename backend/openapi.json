@@ -901,6 +901,63 @@
         "required" : [ "allowedByProject", "availability", "displayName", "hasUsableConnection", "instanceId", "models", "provider", "selectable" ],
         "type" : "object"
       },
+      "PublicationView" : {
+        "properties" : {
+          "baseBranch" : {
+            "type" : "string"
+          },
+          "branch" : {
+            "type" : "string"
+          },
+          "changeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "commitSha" : {
+            "type" : "string"
+          },
+          "failureCode" : {
+            "type" : "string"
+          },
+          "failureMessage" : {
+            "type" : "string"
+          },
+          "prNumber" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "prUrl" : {
+            "type" : "string"
+          },
+          "remote" : {
+            "type" : "string"
+          },
+          "repoName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "baseBranch", "branch", "changeId", "remote", "repoName", "status" ],
+        "type" : "object"
+      },
+      "PublishRequested" : {
+        "properties" : {
+          "approvalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "branch" : {
+            "type" : "string"
+          },
+          "planHash" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "approvalId", "branch", "planHash" ],
+        "type" : "object"
+      },
       "RepoProfile" : {
         "properties" : {
           "buildTools" : {
@@ -2091,6 +2148,93 @@
           }
         },
         "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/publications" : {
+      "get" : {
+        "operationId" : "publications",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PublicationView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "publish-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/publish" : {
+      "post" : {
+        "operationId" : "publish",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "202" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishRequested"
+                }
+              }
+            },
+            "description" : "Accepted"
+          }
+        },
+        "tags" : [ "publish-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/publish/retry" : {
+      "post" : {
+        "operationId" : "retry",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/PublicationView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "publish-controller" ]
       }
     },
     "/api/v1/runs/{id}/steps" : {

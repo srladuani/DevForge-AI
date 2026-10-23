@@ -63,6 +63,36 @@ final class GitWorkCopy implements WorkCopy {
     }
 
     @Override
+    public String commit(String message, String authorName, String authorEmail, java.time.Instant when) {
+        GitProcess.run(root, "add", "-A");
+        String date = when.getEpochSecond() + " +0000";
+        var env = java.util.Map.of("GIT_AUTHOR_NAME", authorName, "GIT_AUTHOR_EMAIL", authorEmail, "GIT_COMMITTER_NAME", authorName, "GIT_COMMITTER_EMAIL", authorEmail,
+            "GIT_AUTHOR_DATE", date, "GIT_COMMITTER_DATE", date);
+        var r = GitProcess.runWithInput(root, message, env, "commit", "-q", "--no-verify", "-F", "-");
+        if (r.exit() != 0) throw new EditRejected("COMMIT_FAILED", "Could not record the change as a commit");
+        return GitProcess.run(root, "rev-parse", "HEAD").stdout().trim();
+    }
+
+    @Override
+    public void push(String remoteUrl, String branch, String authHeader) {
+        if (!branch.matches("[A-Za-z0-9._/-]{1,200}") || branch.contains("..") || branch.startsWith("-") || branch.endsWith("/") || branch.endsWith(".lock")) throw new PushRejected("REJECTED", "Invalid branch name");
+        var env = new java.util.HashMap<String, String>();
+        env.put("GIT_TERMINAL_PROMPT", "0");
+        env.put("GIT_ASKPASS", "/bin/false");
+        if (authHeader != null) {
+            env.put("GIT_CONFIG_COUNT", "1");
+            env.put("GIT_CONFIG_KEY_0", "http.extraHeader");
+            env.put("GIT_CONFIG_VALUE_0", authHeader);
+        }
+        var r = GitProcess.runWithInput(root, null, env, "push", "--no-verify", remoteUrl, "HEAD:refs/heads/" + branch);
+        if (r.exit() == 0) return;
+        String out = r.stdout().toLowerCase(java.util.Locale.ROOT);
+        if (out.contains("authentication") || out.contains("403") || out.contains("401") || out.contains("could not read username") || out.contains("permission")) throw new PushRejected("AUTH", "The Git host refused the credential or the account may not push to this repository");
+        if (out.contains("rejected") || out.contains("non-fast-forward") || out.contains("fetch first")) throw new PushRejected("REJECTED", "The branch already exists on the remote with different history");
+        throw new PushRejected("UNREACHABLE", "The push did not complete");
+    }
+
+    @Override
     public void applyPatch(String patch, Set<String> approved) {
         if (patch == null || patch.isBlank()) return;
         var names = GitProcess.runWithInput(root, patch, "apply", "--numstat", "-z", "-");

@@ -36,7 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
  * runner is a stub (the sandbox and real build tools are covered by their own tests), but the work copies, path rules, approval gate, patches
  * and the workflow are the production ones. It proves our side; it does not prove how Claude behaves.
  */
-@TestPropertySource(properties = {"devforge.agent.mode=real", "devforge.workflow.queue-name=real-fix", "devforge.agent.max-tool-calls=6", "devforge.workflow.retry-backoff-millis=10"})
+@TestPropertySource(properties = {"devforge.agent.mode=real", "devforge.workflow.queue-name=real-fix", "devforge.agent.max-tool-calls=6", "devforge.workflow.retry-backoff-millis=10", "devforge.github.allow-file-remotes=true"})
 class RealFixRunTest extends WorkflowTestBase {
     private static final String ADMIN = "admin@example.test";
     private static final String BO = "src/main/java/com/acme/video/TrainingVideoBO.java";
@@ -65,7 +65,9 @@ class RealFixRunTest extends WorkflowTestBase {
 
     @Autowired StubValidator validator;
     private final ScriptedAnthropicServer server = new ScriptedAnthropicServer();
+    private final ai.devforge.testsupport.FakeGitHubServer gh = new ai.devforge.testsupport.FakeGitHubServer();
     private String providerId;
+    private String githubInstanceId;
 
     @Override
     protected void beforeKeys() throws Exception {
@@ -73,6 +75,9 @@ class RealFixRunTest extends WorkflowTestBase {
         String list = api.get(ADMIN, "/api/v1/admin/provider-instances?kind=AI_PROVIDER").andReturn().getResponse().getContentAsString();
         providerId = JsonPath.<List<String>>read(list, "$[?(@.adapterType=='ANTHROPIC')].id").getFirst();
         api.patch(ADMIN, "/api/v1/admin/provider-instances/" + providerId, "{\"baseUrl\":\"" + server.url() + "\"}").andExpect(status().isOk());
+        String hosts = api.get(ADMIN, "/api/v1/admin/provider-instances?kind=GIT_HOST").andReturn().getResponse().getContentAsString();
+        githubInstanceId = JsonPath.<List<String>>read(hosts, "$[?(@.adapterType=='GITHUB')].id").getFirst();
+        api.patch(ADMIN, "/api/v1/admin/provider-instances/" + githubInstanceId, "{\"baseUrl\":\"" + gh.url() + "\"}").andExpect(status().isOk());
         validator.script.clear();
         validator.boAsSeen.clear();
         validator.requests.clear();
@@ -81,6 +86,8 @@ class RealFixRunTest extends WorkflowTestBase {
     @AfterEach
     void restore() throws Exception {
         if (providerId != null) api.patch(ADMIN, "/api/v1/admin/provider-instances/" + providerId, "{\"baseUrl\":\"\"}").andExpect(status().isOk());
+        if (githubInstanceId != null) api.patch(ADMIN, "/api/v1/admin/provider-instances/" + githubInstanceId, "{\"baseUrl\":\"\"}").andExpect(status().isOk());
+        gh.close();
         server.close();
     }
 
@@ -276,5 +283,109 @@ class RealFixRunTest extends WorkflowTestBase {
         String run = start("FIX_AND_PATCH");
         awaitStatus(run, "AWAITING_APPROVAL");
         api.get(u("owner"), "/api/v1/runs/" + run + "/export").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_READY_TO_EXPORT"));
+    }
+
+    // ---- publishing to GitHub (fake API + a local bare repository as the remote)
+
+    private Path remote;
+
+    private int pendingApprovals(String run) throws Exception {
+        return JsonPath.<List<Object>>read(api.get(u("approver"), "/api/v1/workspaces/" + ws + "/approvals?runId=" + run + "&status=PENDING").andReturn().getResponse().getContentAsString(), "$").size();
+    }
+
+    private void githubToken(String who, String token) throws Exception {
+        String id = Api.json(api.post(u(who), "/api/v1/me/connections", "{\"kind\":\"GIT_HOST\",\"providerType\":\"GITHUB\",\"authMethod\":\"PAT\",\"label\":\"gh\",\"secret\":\"" + token + "\"}").andExpect(status().isCreated()), "$.id");
+        api.post(u(who), "/api/v1/me/connections/" + id + "/verify", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("VALID"));
+    }
+
+    private void setUpRemote() {
+        remote = tmp.resolve("acme").resolve("service.git");
+        FixtureRepos.git(tmp, "init", "-q", "--bare", remote.toString());
+        FixtureRepos.git(tmp.resolve("backend"), "remote", "add", "origin", remote.toUri().toString().replaceAll("/$", ""));
+    }
+
+    private String publishReady() throws Exception {
+        setUpRemote();
+        githubToken("owner", gh.acceptedToken);
+        return runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
+    }
+
+    private void awaitPublication(String run, String wanted) {
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(20)).until(() ->
+            Api.json(api.get(u("owner"), "/api/v1/runs/" + run + "/publications"), "$[0].status").equals(wanted));
+    }
+
+    @Test
+    void nothingLeavesUntilAPersonApprovesExactlyThePlanThenTheBranchIsPushedAndADraftPullRequestOpened() throws Exception {
+        String run = publishReady();
+        String requested = api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isAccepted()).andReturn().getResponse().getContentAsString();
+        String branch = JsonPath.read(requested, "$.branch");
+        assertThat(gh.pullCreations()).isEmpty();
+        assertThat(FixtureRepos.git(remote, "branch", "--list")).as("nothing pushed before approval").isBlank();
+        api.get(u("owner"), "/api/v1/runs/" + run + "/publications").andExpect(jsonPath("$.length()").value(0));
+
+        String approval = pendingApprovalId(run);
+        api.get(u("approver"), "/api/v1/workspaces/" + ws + "/approvals?runId=" + run).andExpect(jsonPath("$[0].kind").value("PR")).andExpect(jsonPath("$[0].summary").value(org.hamcrest.Matchers.containsString("draft pull request")));
+        decide(u("approver"), approval, "APPROVE", "sha256:not-the-plan").andExpect(status().isConflict());
+        assertThat(gh.pullCreations()).isEmpty();
+        decide(u("approver"), approval, "APPROVE", pendingApprovalHash(run)).andExpect(status().isOk());
+        awaitPublication(run, "PR_OPEN");
+
+        api.get(u("viewer"), "/api/v1/runs/" + run + "/publications").andExpect(jsonPath("$[0].prNumber").value(7)).andExpect(jsonPath("$[0].prUrl").value("https://github.test/acme/service/pull/7"))
+            .andExpect(jsonPath("$[0].branch").value(branch)).andExpect(jsonPath("$[0].baseBranch").value("main")).andExpect(jsonPath("$[0].remote").value("acme/service"));
+        assertThat(FixtureRepos.git(remote, "log", "-1", "--format=%an|%ae|%s", "refs/heads/" + branch).trim()).contains(u("owner")).contains("Filter the videos by role in the BO");
+        assertThat(FixtureRepos.git(remote, "rev-parse", "refs/heads/" + branch + "^").trim()).as("the commit sits on the real base commit").isEqualTo(FixtureRepos.git(tmp.resolve("backend"), "rev-parse", "HEAD").trim());
+        assertThat(FixtureRepos.git(remote, "show", "refs/heads/" + branch + ":" + BO)).contains("\"admin\".equals(role)");
+        var pr = gh.pullCreations().getFirst();
+        assertThat(pr.body()).contains("\"draft\":true").contains("\"base\":\"main\"").contains("\"head\":\"" + branch + "\"").contains("How it was checked");
+        assertThat(pr.authorization()).isEqualTo("Bearer " + gh.acceptedToken);
+        String events = api.get(u("owner"), "/api/v1/runs/" + run + "/events").andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(events, "$[*].type")).contains("PUBLISH_REQUESTED", "APPROVAL_DECIDED", "BRANCH_PUSHED", "PULL_REQUEST_OPENED");
+        assertThat(events).doesNotContain(gh.acceptedToken);
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish/retry", null).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOTHING_TO_RETRY"));
+    }
+
+    @Test
+    void aRejectedPlanPublishesNothingAndOnlyTheOwnerCanAsk() throws Exception {
+        String run = publishReady();
+        api.post(u("approver"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("OWNER_ONLY"));
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isAccepted());
+        decide(u("approver"), pendingApprovalId(run), "REJECT", pendingApprovalHash(run)).andExpect(status().isOk());
+        Thread.sleep(300);
+        assertThat(gh.pullCreations()).isEmpty();
+        assertThat(FixtureRepos.git(remote, "branch", "--list")).isBlank();
+        api.get(u("owner"), "/api/v1/runs/" + run + "/publications").andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void aRefusedTokenFailsThePublicationClearlyAndTheFixedOneRetriesWithoutDuplicatingAnything() throws Exception {
+        String run = publishReady();
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isAccepted());
+        gh.pullCreateStatus = 403;
+        gh.pullCreateMessage = "Resource not accessible by personal access token";
+        decide(u("approver"), pendingApprovalId(run), "APPROVE", pendingApprovalHash(run)).andExpect(status().isOk());
+        awaitPublication(run, "FAILED");
+        api.get(u("owner"), "/api/v1/runs/" + run + "/publications").andExpect(jsonPath("$[0].failureCode").value("HOST_AUTH"));
+        String branch = Api.json(api.get(u("owner"), "/api/v1/runs/" + run + "/publications"), "$[0].branch");
+        assertThat(FixtureRepos.git(remote, "branch", "--list").trim()).as("the branch was pushed before the PR step failed").contains(branch);
+
+        gh.pullCreateStatus = 201;
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish/retry", null).andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PR_OPEN"));
+        assertThat(gh.requests().stream().filter(r -> r.method().equals("POST") && r.path().endsWith("/pulls")).count()).as("one rejected attempt and one that created the PR").isEqualTo(2);
+        assertThat(FixtureRepos.git(remote, "branch", "--list").lines().filter(l -> !l.isBlank()).count()).isEqualTo(1);
+    }
+
+    @Test
+    void aRemoteThatIsNotTheConfiguredHostNeverReceivesTheTokenAndWithoutAConnectionTheAskIsRefused() throws Exception {
+        setUpRemote();
+        String run = runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("NO_USABLE_CONNECTION"));
+        githubToken("owner", gh.acceptedToken);
+        FixtureRepos.git(tmp.resolve("backend"), "remote", "set-url", "origin", "https://evil.example/acme/service.git");
+        int before = gh.requests().size();
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("HOST_UNSUPPORTED_REMOTE"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("never sent anywhere else")));
+        assertThat(gh.requests().size()).as("no call carried the token anywhere").isEqualTo(before);
+        assertThat(pendingApprovals(run)).isZero();
     }
 }

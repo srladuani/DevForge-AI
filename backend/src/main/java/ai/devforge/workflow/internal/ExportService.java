@@ -65,14 +65,21 @@ class ExportService {
         if (PatchScanner.scan(c.patch()).stream().anyMatch(s -> s.severity().equals("BLOCK"))) {
             throw DomainException.unprocessable("SECRET_IN_PATCH", "The patch appears to contain a credential, so it cannot be exported");
         }
-        String body = p.proposal() == null ? "" : p.proposal().summary() + "\n\n" + p.proposal().recommended() + "\n";
-        String refs = p.ticketKey() == null ? "" : "\nRefs: " + p.ticketKey();
-        String checks = p.validations().stream().filter(v -> v.codeChangeId().equals(c.id())).map(v -> "Checks: " + v.status().toLowerCase().replace('_', ' ')).findFirst().orElse("Checks: none recorded");
         CurrentUser author = users.find(runs.load(runId, user, Permission.VIEW).ownerUserId()).orElse(user);
         String patch = c.patch().endsWith("\n") ? c.patch() : c.patch() + "\n";
         return "From " + "0".repeat(40) + " Mon Sep 17 00:00:00 2001\nFrom: " + author.displayName().replaceAll("[<>\\r\\n]", "") + " <" + author.email() + ">\nDate: " + ZonedDateTime.now(ZoneOffset.UTC).format(RFC_2822)
-            + "\nSubject: [PATCH] " + p.subject().replaceAll("[\\r\\n]", " ") + "\n\n" + body.strip() + refs + "\n" + checks + "\nGenerated-by: DevForge AI (run " + runId + ")\n---\n" + patch;
+            + "\nSubject: [PATCH] " + p.subject().replaceAll("[\\r\\n]", " ") + "\n\n" + messageBody(p, c, runId) + "\n---\n" + patch;
     }
+
+    /** The commit message body (everything after the subject line), the same for the patch file and for a published commit. */
+    static String messageBody(Prepared p, ChangeView c, UUID runId) {
+        String body = p.proposal() == null ? "" : p.proposal().summary() + "\n\n" + p.proposal().recommended() + "\n";
+        String refs = p.ticketKey() == null ? "" : "\nRefs: " + p.ticketKey();
+        String checks = p.validations().stream().filter(v -> v.codeChangeId().equals(c.id())).map(v -> "Checks: " + v.status().toLowerCase().replace('_', ' ')).findFirst().orElse("Checks: none recorded");
+        return body.strip() + refs + "\n" + checks + "\nGenerated-by: DevForge AI (run " + runId + ")";
+    }
+
+    String prBody(UUID runId, Prepared p) { return PrDescription.build(runId.toString(), p.ticketKey(), p.subject(), p.proposal(), data.findings(runId), p.changes(), p.validations()); }
 
     String fileNameOf(UUID runId, UUID changeId, CurrentUser user) {
         Prepared p = prepare(runId, user);
@@ -80,9 +87,9 @@ class ExportService {
         return fileName(p.branch(), c.repoName());
     }
 
-    private record Prepared(String branch, String subject, String ticketKey, FixProposalDraft proposal, List<ChangeView> changes, List<ValidationView> validations) {}
+    record Prepared(String branch, String subject, String ticketKey, FixProposalDraft proposal, List<ChangeView> changes, List<ValidationView> validations) {}
 
-    private Prepared prepare(UUID runId, CurrentUser user) {
+    Prepared prepare(UUID runId, CurrentUser user) {
         RunRow run = runs.load(runId, user, Permission.VIEW);
         if (run.status() != RunStatus.AWAITING_REVIEW && run.status() != RunStatus.COMPLETED) {
             throw DomainException.conflict("NOT_READY_TO_EXPORT", "A change can be exported once it has been prepared and is awaiting review, or accepted");

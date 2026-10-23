@@ -14,9 +14,12 @@ final class GitProcess {
 
     record Result(int exit, String stdout) {}
 
-    static Result run(Path dir, String... args) { return runWithInput(dir, null, args); }
+    static Result run(Path dir, String... args) { return runWithInput(dir, null, java.util.Map.of(), args); }
 
-    static Result runWithInput(Path dir, String stdin, String... args) {
+    static Result runWithInput(Path dir, String stdin, String... args) { return runWithInput(dir, stdin, java.util.Map.of(), args); }
+
+    /** {@code extraEnv} is for per-call settings such as a credential header; it never appears on the command line. */
+    static Result runWithInput(Path dir, String stdin, java.util.Map<String, String> extraEnv, String... args) {
         List<String> cmd = new ArrayList<>(List.of("git", "-c", "core.quotepath=false", "-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false", "-c", "core.autocrlf=false", "-C", dir.toString()));
         cmd.addAll(Arrays.asList(args));
         ProcessBuilder pb = new ProcessBuilder(cmd).redirectErrorStream(true);
@@ -30,6 +33,7 @@ final class GitProcess {
         pb.environment().put("GIT_AUTHOR_EMAIL", "devforge@localhost");
         pb.environment().put("GIT_COMMITTER_NAME", "DevForge");
         pb.environment().put("GIT_COMMITTER_EMAIL", "devforge@localhost");
+        pb.environment().putAll(extraEnv);
         try {
             Process p = pb.start();
             try (var in = p.getOutputStream()) {
