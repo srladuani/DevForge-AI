@@ -17,7 +17,7 @@
 | Gate | Check |
 |---|---|
 | FE-1 | `npm run lint` (0 errors, warnings budgeted), `npm run typecheck` (strict), `npm test`, `npm run build` |
-| BE-1 | `./mvnw -B verify`: compile with `-Xlint` + `-Werror` on our code, unit + integration tests, JaCoCo coverage ≥ 70% line on `domain`/`application` packages (guard, not target) |
+| BE-1 | `./gradlew clean build`: compile with `-Xlint` + `-Werror` on our code, unit + integration tests, JaCoCo coverage ≥ 70% line on `domain`/`application` packages (guard, not target) |
 | BE-2 | Modulith `verify()` + ArchUnit: no module cycles, no `internal` access, no JPA entities in `web` |
 | API-1 | Generated `openapi.json` equals committed snapshot (intentional changes reviewed); FE client regenerates with no diff |
 | SEC-1 | Secret scan (gitleaks) on repo and on every generated diff before push |
@@ -39,13 +39,13 @@ Dataset: `eval/golden/<case>/{input.json, repo-fixture or pinned sha, expected.j
 ## Status as of M1
 | Gate | State |
 |---|---|
-| BE-1/BE-2 | `./mvnw clean verify`: 114 tests on a real PostgreSQL; Modulith + boundary test. JaCoCo/ArchUnit vendor-import rule: **not yet added** |
+| BE-1/BE-2 | `./gradlew clean build`: 114 tests on a real PostgreSQL; Modulith + boundary test. JaCoCo/ArchUnit vendor-import rule: **not yet added** |
 | FE-1 | lint (0 warnings), strict typecheck, 47 tests, production build — all passing |
 | API-1 | `OpenApiContractTest` (snapshot) + `ContractConformanceTest` (real responses vs. schema) + generated client check in `scripts/verify.sh` |
 | EXEC-1, AI-1..3, SEC-1..3, PR-1 | not applicable yet or not yet automated (no sandbox, no real model, no CI host) |
 | E2E | one real-browser journey (`frontend/e2e`), run locally via `scripts/verify.sh --e2e` |
 
-**Practices that paid off in M1:** (a) *mutation checks* — deliberately breaking 7 safety rules (approval hash, owner-only credentials, vault binding, denylist, evidence downgrade, cancel handling, hash check) and confirming a test fails each time; run `./mvnw clean` after (stale classes otherwise hide the restore); (b) a *dishonest-agent* test that proves the server, not the agent, decides what is verified; (c) conformance of real responses to the published schema; (d) tests found real bugs: read off-by-one at end of file, approval-expiry rolled back by its own error, auto-approval re-requested after rejection, async-dispatch authorization breaking SSE, empty-id requests from the run page, test files outranking code.
+**Practices that paid off in M1:** (a) *mutation checks* — deliberately breaking 7 safety rules (approval hash, owner-only credentials, vault binding, denylist, evidence downgrade, cancel handling, hash check) and confirming a test fails each time; run `./gradlew clean` after (stale classes otherwise hide the restore); (b) a *dishonest-agent* test that proves the server, not the agent, decides what is verified; (c) conformance of real responses to the published schema; (d) tests found real bugs: read off-by-one at end of file, approval-expiry rolled back by its own error, auto-approval re-requested after rejection, async-dispatch authorization breaking SSE, empty-id requests from the run page, test files outranking code.
 
 ## Added in M2
 AI-1 is now a real gate: `ReplayEvalTest` (6 golden cases through the production loop and verifier; no unsupported trusted claim, honest citations all verify, dishonest ones are downgraded, no secret reaches the model, every injected escape is refused). Adapter contract tests (`AnthropicAdapterTest`, `AnthropicVerifierTest`) run against `ScriptedAnthropicServer`. `ArchitectureRulesTest` (ArchUnit) enforces vendor isolation and secret handling. `RealModeRunTest` runs the whole workflow with the real adapter against the scripted server. `LiveEvalTest` is the live-model measurement (opt-in). Mutation checks were repeated for the new safety logic (denylist/leak and trust downgrade are caught by the evals).

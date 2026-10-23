@@ -43,7 +43,7 @@ class BubblewrapSandboxTest {
 
     @Test
     void cannotSeeTheHostHomeOrWriteAnywhereButTheWorkDirectory() throws IOException {
-        Path canary = Path.of("target", "sandbox-canary-" + System.nanoTime() + ".txt").toAbsolutePath();
+        Path canary = Path.of("build", "sandbox-canary-" + System.nanoTime() + ".txt").toAbsolutePath();
         Files.writeString(canary, "host secret");
         try {
             assertThat(run("cat '" + canary + "' 2>&1; test -e '" + canary + "' && echo VISIBLE || echo HIDDEN").output()).contains("HIDDEN").doesNotContain("host secret");

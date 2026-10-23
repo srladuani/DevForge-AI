@@ -42,7 +42,7 @@ Manual start:
 docker compose up -d postgres
 cd backend
 export DEVFORGE_MASTER_KEY="$(openssl rand -base64 32)" DEVFORGE_DEV_ADMINS="you@example.com"
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+./gradlew bootRun
 cd ../frontend && npm ci && npm run dev
 ```
 
@@ -60,7 +60,7 @@ scripts/verify.sh           # backend + frontend gates
 scripts/verify.sh --e2e     # plus the browser end-to-end test (stack must be running)
 ```
 
-After changing the API: refresh the snapshot (`./mvnw test -Dopenapi.update=true`), review the diff, then `npm run gen:api`.
+After changing the API: refresh the snapshot (`./gradlew test --tests OpenApiContractTest -Dopenapi.update=true`), review the diff, then `npm run gen:api`.
 
 ## Repository layout
 

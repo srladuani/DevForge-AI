@@ -16,7 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Opt-in: runs the real npm recipe (online dependency step, offline test step) in the sandbox on a tiny project with no dependencies.
- * Needs a Node install visible to the sandbox: {@code DEVFORGE_SMOKE_NODE_HOME=/path/to/node/install ./mvnw test -Dtest=ToolchainSmokeTest}.
+ * Needs a Node install visible to the sandbox: {@code DEVFORGE_SMOKE_NODE_HOME=/path/to/node/install ./gradlew test --tests ToolchainSmokeTest}.
  */
 class ToolchainSmokeTest {
     @TempDir Path tmp;

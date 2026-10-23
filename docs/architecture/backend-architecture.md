@@ -33,7 +33,7 @@ backend/src/main/resources/{db/migration, prompts/, agent-profiles/}
 - **Security**: Spring Security resource server; method security via `@PreAuthorize` using a `WorkspaceAccess` bean.
 
 ## Build and run
-`cd backend && ./mvnw verify` · `./mvnw spring-boot:run -Dspring-boot.run.profiles=local` with `docker compose up -d postgres`.
+`cd backend && ./gradlew clean build` · `./gradlew bootRun` with `docker compose up -d postgres`.
 
 ## As built in M1
 - Modules: `platform` (open shared kernel), `identity` (users, vault, connections, dev auth, admin), `audit`, `repository`, `workspace`, `integration` (provider instances/adapter types), `agent` (ports, catalog, simulation), `approval`, `workflow`. `ApplicationModules.verify()` passes; `ModularityTest` guards it.

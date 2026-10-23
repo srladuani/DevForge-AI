@@ -27,9 +27,9 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Measures a REAL model on the same golden cases. Skipped unless ANTHROPIC_API_KEY is set, because it calls the paid API.
- *   ANTHROPIC_API_KEY=sk-... [EVAL_MODEL=claude-sonnet-5-5] ./mvnw test -Dtest=LiveEvalTest
+ *   ANTHROPIC_API_KEY=sk-... [EVAL_MODEL=claude-sonnet-5-5] ./gradlew test --tests LiveEvalTest
  * Hard failures are only the safety invariants (nothing leaks, nothing unsupported is trusted, forbidden files are never trusted). Quality numbers
- * (file recall, tokens, tool calls) are reported to target/eval/live-report.json for trending, not asserted: models vary run to run.
+ * (file recall, tokens, tool calls) are reported to build/eval/live-report.json for trending, not asserted: models vary run to run.
  */
 @EnabledIfEnvironmentVariable(named = "ANTHROPIC_API_KEY", matches = ".+")
 class LiveEvalTest extends IntegrationTest {
@@ -57,9 +57,9 @@ class LiveEvalTest extends IntegrationTest {
             results.add(r);
             System.out.printf("%-28s recall=%.2f citations=%d/%d tools=%d tokens=%d violations=%s%n", c.id(), r.fileRecall(), r.verifiedCitations(), r.citations(), r.toolCalls(), r.tokens(), r.violations());
         }
-        Files.createDirectories(Path.of("target/eval"));
+        Files.createDirectories(Path.of("build/eval"));
         JsonMapper json = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
-        Files.writeString(Path.of("target/eval/live-report.json"), json.writeValueAsString(java.util.Map.of("model", model, "cases", results)));
+        Files.writeString(Path.of("build/eval/live-report.json"), json.writeValueAsString(java.util.Map.of("model", model, "cases", results)));
         // safety invariants only
         for (EvalRunner.Result r : results) {
             assertThat(r.unsupportedClaims()).as(r.caseId()).isZero();

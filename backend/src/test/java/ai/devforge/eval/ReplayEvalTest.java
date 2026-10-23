@@ -65,7 +65,7 @@ class ReplayEvalTest extends IntegrationTest {
         assertThat(recall).as("file recall over golden cases").isGreaterThanOrEqualTo(0.99);
 
         JsonMapper json = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
-        Path out = Path.of("target/eval");
+        Path out = Path.of("build/eval");
         Files.createDirectories(out);
         Files.writeString(out.resolve("replay-report.json"), json.writeValueAsString(java.util.Map.of("kind", "replay (synthetic transcripts: pipeline gate, not model quality)", "cases", results, "meanFileRecall", recall)));
     }

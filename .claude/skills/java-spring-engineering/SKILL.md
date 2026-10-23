@@ -1,7 +1,7 @@
 ---
 name: java-spring-engineering
 description: Java 21 / Spring Boot conventions for DevForge backend code (module layering, validation, errors, persistence, security, testing). Use when writing or modifying backend code, or when reviewing Spring code in a target repo.
-paths: "**/*.java, **/pom.xml, **/application*.yml"
+paths: "**/*.java, **/build.gradle.kts, **/application*.yml"
 ---
 
 # Java & Spring Boot Engineering
@@ -39,4 +39,4 @@ Read the module's existing code and `docs/architecture/backend-architecture.md`.
 - A bug fix includes a test that fails without the fix.
 
 ## Done when
-`./mvnw verify` passes (actually run), no new warnings, migrations apply on empty DB, OpenAPI diff reviewed if API changed.
+`./gradlew clean build` passes (actually run), no new warnings, migrations apply on empty DB, OpenAPI diff reviewed if API changed.

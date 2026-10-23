@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 step() { printf '\n\033[1m== %s\033[0m\n' "$1"; }
 
 step "Backend: compile, unit + integration tests (real PostgreSQL), module boundaries, API contract"
-(cd backend && ./mvnw -B clean verify)
+(cd backend && ./gradlew --console=plain clean build)
 
 step "Frontend: lint (no warnings), strict type check, unit/UI tests, production build"
 (cd frontend && npm ci --no-audit --no-fund && npm run lint && npm run typecheck && npm test && npm run build)

@@ -18,7 +18,7 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * API contract gate. The generated OpenAPI document must equal the committed snapshot (backend/openapi.json), so an API change is always a
  * deliberate, reviewed diff. The frontend's typed client is generated from the same file. To accept an intended change run:
- * {@code ./mvnw test -Dtest=OpenApiContractTest -Dopenapi.update=true} and review the diff.
+ * {@code ./gradlew test --tests OpenApiContractTest -Dopenapi.update=true} and review the diff.
  */
 class OpenApiContractTest extends IntegrationTest {
     private static final Path SNAPSHOT = Path.of("openapi.json");

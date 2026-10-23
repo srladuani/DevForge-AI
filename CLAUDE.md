@@ -31,7 +31,7 @@ It is a product, not an internal tool. No company, customer, repo name, tracker,
 - Out of scope now: production system access, auto-merge, autonomous deploys, multi-tenancy, microservices/Kafka/Kubernetes.
 
 ## Stack (see `docs/architecture/architecture-decisions/`)
-- Backend: Java 21, Spring Boot 4.1.x (Jackson 3), Maven (wrapper), PostgreSQL + Flyway, `JdbcClient` + records (no JPA), modular monolith verified by Spring Modulith.
+- Backend: Java 21, Spring Boot 4.1.x (Jackson 3), Gradle (Kotlin DSL, wrapper; ADR-0015), PostgreSQL + Flyway, `JdbcClient` + records (no JPA), modular monolith verified by Spring Modulith.
 - Frontend: React 19 + TypeScript 5.9 (strict; pinned for openapi-typescript) + Vite, Tailwind 4 + own accessible primitives, React Router, TanStack Query, `openapi-fetch` typed client, oxlint, Vitest/MSW/vitest-axe, Playwright.
 - AI: own thin `LlmClient`/tool ports and a deterministic workflow engine; **LangChain4j** behind per-provider adapters (M0 spike result, ADR-0004); we run the tool loop ourselves; MCP Java SDK for Jira. Clients are built per credential.
 - Execution: rootless Docker sandbox, no network by default.
@@ -48,7 +48,7 @@ scripts/    verify.sh = the quality gate
 Backend modules (built): `platform` (shared), `identity`, `audit`, `repository`, `workspace`, `integration`, `agent`, `approval`, `workflow`; `execution` (sandbox, private work copies, validator). **A module's root package is its public API; `internal` is private** — other modules may use only the root package or domain events (enforced by `ModularityTest`).
 
 ## Commands
-`docker compose up -d postgres` · backend `cd backend && ./mvnw verify` / `./mvnw spring-boot:run -Dspring-boot.run.profiles=local` (port **9090**, needs `DEVFORGE_MASTER_KEY`) · frontend `cd frontend && npm run dev | lint | typecheck | test | build | gen:api | e2e` · everything: `scripts/verify.sh [--e2e]`. After editing the API: update the snapshot (`-Dopenapi.update=true`), review the diff, then `npm run gen:api`. After mutating sources for a test, run `./mvnw clean` (stale classes hide the restore).
+`docker compose up -d postgres` · backend `cd backend && ./gradlew clean build` / `./gradlew bootRun` (local profile) (port **9090**, needs `DEVFORGE_MASTER_KEY`) · frontend `cd frontend && npm run dev | lint | typecheck | test | build | gen:api | e2e` · everything: `scripts/verify.sh [--e2e]`. After editing the API: update the snapshot (`./gradlew test --tests OpenApiContractTest -Dopenapi.update=true`), review the diff, then `npm run gen:api`. After mutating sources for a test, run `./gradlew clean` (stale classes hide the restore).
 
 ## Hard rules
 1. No AI orchestration in React; the UI only calls the backend API.
@@ -68,7 +68,7 @@ Backend modules (built): `platform` (shared), `identity`, `audit`, `repository`,
 - Comments explain *why*; follow surrounding style.
 
 ## Testing and completion
-"Done" requires you actually ran, and read the output of: backend `./mvnw verify`; frontend `npm run lint && npm run typecheck && npm test && npm run build`; plus relevant gates in `docs/engineering/testing-strategy.md` (including adapter contract tests and AI evals when those areas change). Report failures verbatim; say what was not run. Use `test-and-validation`.
+"Done" requires you actually ran, and read the output of: backend `./gradlew clean build`; frontend `npm run lint && npm run typecheck && npm test && npm run build`; plus relevant gates in `docs/engineering/testing-strategy.md` (including adapter contract tests and AI evals when those areas change). Report failures verbatim; say what was not run. Use `test-and-validation`.
 
 ## Skills (invoke explicitly when the task matches)
 | Skill | Use for |

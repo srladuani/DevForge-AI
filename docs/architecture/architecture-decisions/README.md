@@ -5,7 +5,7 @@ Format: Status · Context · Options · Decision · Consequences · Revisit when
 | ADR | Decision | Status |
 |---|---|---|
 | [0001](0001-modular-monolith.md) | Modular monolith, Spring Modulith-verified | Proposed |
-| [0002](0002-maven-build.md) | Maven (wrapper) | Proposed |
+| [0002](0002-maven-build.md) | Maven (wrapper) | Superseded by 0015 |
 | [0003](0003-orchestration-model.md) | Deterministic workflow + single tool-using agent loop | Proposed |
 | [0004](0004-ai-integration-layer.md) | Own thin ports; LangChain4j adapters (M0 spike), MCP Java SDK | Accepted for M1–M2, live re-check pending |
 | [0005](0005-persistence-and-jobs.md) | PostgreSQL + Flyway; DB-backed job queue | Proposed |
@@ -20,3 +20,4 @@ Format: Status · Context · Options · Decision · Consequences · Revisit when
 | [0014](0014-investigation-loop-and-tool-policy.md) | Bounded read-only investigation loop, server-side tool policy, mode gating, named queues | Proposed (scripted-provider verified) |
 
 All are *Proposed* until the planning review accepts them.
+| [0015](0015-gradle-build.md) | Gradle (Kotlin DSL, wrapper) for the backend | Accepted |

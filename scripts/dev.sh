@@ -38,7 +38,7 @@ docker compose up -d postgres >/dev/null
 until docker compose exec -T postgres pg_isready -U devforge >/dev/null 2>&1; do sleep 1; done
 
 if ! ss -ltn | grep -q ":9090 "; then
-  (cd backend && nohup ./mvnw -B -q spring-boot:run -Dspring-boot.run.profiles=local > ../.dev/backend.log 2>&1 &)
+  (cd backend && nohup ./gradlew -q bootRun > ../.dev/backend.log 2>&1 &)
 fi
 until curl -fs localhost:9090/actuator/health >/dev/null 2>&1; do sleep 2; done
 

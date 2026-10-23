@@ -1,4 +1,5 @@
 # ADR-0002: Maven for the backend
+**Status: Superseded by [ADR-0015](0015-gradle-build.md) (Gradle).** Kept for the record.
 **Status:** Proposed
 ## Context
 Java 21 installed locally; neither Maven nor Gradle is installed, so a wrapper is required either way. Target repos' build tool unknown (open question).

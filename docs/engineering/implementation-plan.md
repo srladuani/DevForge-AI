@@ -42,7 +42,7 @@ Risks addressed: R1, R2, R3, R4, R6.
 Goal: prove UX, API contracts, persistence, workflow/state machine, SSE; **no real LLM or Jira**; UI marks simulated data.
 | # | Task | Depends | Acceptance |
 |---|---|---|---|
-| 1.1 | Repo scaffold: `backend/` (Boot, Maven wrapper, Modulith verify, Flyway, Testcontainers), `frontend/` (Vite, TS strict, Tailwind, shadcn, Router, Query), `docker-compose.yml` (postgres), `.env.example`, CI workflow, `.gitignore` | — | both builds green; gates BE-1/BE-2/FE-1 run |
+| 1.1 | Repo scaffold: `backend/` (Boot, Gradle wrapper, Modulith verify, Flyway, Testcontainers), `frontend/` (Vite, TS strict, Tailwind, shadcn, Router, Query), `docker-compose.yml` (postgres), `.env.example`, CI workflow, `.gitignore` | — | both builds green; gates BE-1/BE-2/FE-1 run |
 | 1.2 | `platform`: problem+json errors, MDC logging, config, health | 1.1 | error contract tests |
 | 1.3a | Provider registries: `ProviderInstance` table + YAML seed, admin API/UI (add/update/disable/remove), adapter-type registry; `Connection` generalisation (AI/Git/tracker) with API-key/PAT; repo probe-by-URL | 1.3 | admin can add an OpenAI-compatible instance without code change; removing an in-use instance is soft; probe verifies access with the user's connection |
 | 1.3 | `identity`: local-dev auth profile + role model (OIDC wiring stub); **user AI-credential vault** (envelope encryption, write-only API, verify, rotate) | 1.2 | authz matrix test; vault tests: no secret in logs/DTOs, rotation, wrong-user access denied |
@@ -59,7 +59,7 @@ All tasks delivered except where noted. Evidence: backend **114 tests** (real Po
 
 | Task | Result |
 |---|---|
-| 1.1 scaffold | `backend/` (Boot 4.1.2, Maven wrapper, Flyway, Modulith verify), `frontend/` (Vite 8, React 19, TS 5.9 strict, Tailwind 4), `docker-compose.yml`, `.env.example`, `scripts/verify.sh`. **Not done:** a CI workflow file (Git host undecided, Q4) — `verify.sh` is the host-neutral gate |
+| 1.1 scaffold | `backend/` (Boot 4.1.2, Gradle wrapper (was Maven until M5; ADR-0015), Flyway, Modulith verify), `frontend/` (Vite 8, React 19, TS 5.9 strict, Tailwind 4), `docker-compose.yml`, `.env.example`, `scripts/verify.sh`. **Not done:** a CI workflow file (Git host undecided, Q4) — `verify.sh` is the host-neutral gate |
 | 1.2 platform | problem+json with stable codes, request ids, redaction, error-contract tests |
 | 1.3 identity | local dev sign-in (**local profile only**; OIDC not built), AES-256-GCM vault bound to connection+owner, key versions + rotation, write-only API |
 | 1.3a registries | provider instances (admin add/update/disable/remove), adapter-type registry, unified per-user `Connection`. **Deferred to M2:** repo probe-by-URL / clone (managed clones) |

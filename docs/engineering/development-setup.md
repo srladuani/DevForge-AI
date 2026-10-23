@@ -9,7 +9,7 @@ Nothing below is implemented yet; this is the target. Items marked ✔ were obse
 | Node.js / npm | ≥ 22 / ≥ 10 | ✔ 22.23.2 / 10.9.8 |
 | Docker (rootless preferred) | ≥ 27 | ✔ Docker Desktop 29.x working (needed for the database and Testcontainers). Earlier M0 note about group access is obsolete; sandbox limits still unverified. bubblewrap (`bwrap`) available as a Tier-1 stand-in |
 | git | ≥ 2.40 | ✔ 2.53 |
-| Maven | via wrapper (`./mvnw`) | not installed — not needed |
+| Gradle | via wrapper (`./gradlew`, downloads the pinned version on first use) | not installed — not needed |
 | ripgrep | any | to verify |
 | PostgreSQL | 16 via Docker | no local psql |
 | AI provider key (Claude / OpenAI / Gemini) | per user, entered in the UI | each developer supplies their own |
@@ -39,17 +39,17 @@ Open http://localhost:8080 and sign in with any email (local development only). 
 ## Commands (working as of M1)
 ```bash
 docker compose up -d postgres                                      # database on :5432
-cd backend && ./mvnw verify                                        # build + all tests (needs Docker: Testcontainers)
+cd backend && ./gradlew clean build                                # build + all tests (needs Docker: Testcontainers)
 export DEVFORGE_MASTER_KEY="$(openssl rand -base64 32)" DEVFORGE_DEV_ADMINS="you@example.com"
-cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # API on :9090
+cd backend && ./gradlew bootRun                                    # API on :9090 (local profile)
 cd frontend && npm ci && npm run dev                               # UI on :8080, proxies /api to :9090
 cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 cd frontend && npm run gen:api                                     # regenerate client types from backend/openapi.json
 cd frontend && npx playwright install chromium && npm run e2e      # real-browser test (stack must be running)
 scripts/verify.sh [--e2e]                                          # everything above, as one gate
 ```
-To accept an intentional API change: `cd backend && ./mvnw test -Dtest=OpenApiContractTest -Dopenapi.update=true`, review the `openapi.json` diff, then `npm run gen:api`.
-Real model mode: set `DEVFORGE_AGENT_MODE=real` (default `simulated`); users then add their own Anthropic API key in the UI. Live evaluation against the real API (costs money, runs only if the key is set): `ANTHROPIC_API_KEY=sk-... ./mvnw test -Dtest=LiveEvalTest` → `backend/target/eval/live-report.json`.
+To accept an intentional API change: `cd backend && ./gradlew test --tests OpenApiContractTest -Dopenapi.update=true`, review the `openapi.json` diff, then `npm run gen:api`.
+Real model mode: set `DEVFORGE_AGENT_MODE=real` (default `simulated`); users then add their own Anthropic API key in the UI. Live evaluation against the real API (costs money, runs only if the key is set): `ANTHROPIC_API_KEY=sk-... ./gradlew test --tests LiveEvalTest` → `backend/build/eval/live-report.json`.
 Environment: `DEVFORGE_DB_URL/USER/PASSWORD`, `DEVFORGE_MASTER_KEY` (required; losing it makes stored connections unreadable), `DEVFORGE_DEV_ADMINS`, `DEVFORGE_PORT` (default 9090). The AI keys are **not** environment variables: each user adds their own in the UI. Repositories may only be registered under `devforge.repositories.allowed-roots` (default: your home directory).
 The "local" profile enables **header-based dev sign-in**; never expose a backend running it.
 
