@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 /**
  * End-to-end tests drive a real browser against the real backend and database (not mocks).
- * Start the stack first (see docs/engineering/development-setup.md): Postgres, the backend on :8787 with the "local" profile, and this Vite server.
+ * Start the stack first (see docs/engineering/development-setup.md): Postgres, the backend on :9090 with the "local" profile, and this Vite server.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -12,7 +12,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   outputDir: 'test-results',
-  use: { baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:5173', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
+  use: { baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8080', trace: 'retain-on-failure', screenshot: 'only-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: { command: 'npm run dev', url: 'http://localhost:5173', reuseExistingServer: true, timeout: 60_000 },
+  webServer: { command: 'npm run dev', url: 'http://localhost:8080', reuseExistingServer: true, timeout: 60_000 },
 })

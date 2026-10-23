@@ -221,4 +221,60 @@ class RealFixRunTest extends WorkflowTestBase {
         assertThat(JsonPath.<List<String>>read(validations, "$[*].status")).containsExactly("NOT_RUN");
         assertThat(JsonPath.<List<String>>read(validations, "$[*].summary").getFirst()).contains("no repository code was run");
     }
+
+    private String runToReview(String testFileContent) throws Exception {
+        findings().then(toolUse("p", "submit_proposal", proposal(TEST, true), 100, 10))
+            .then(toolUse("e1", "edit_file", edit(BO, OLD, NEW), 100, 10))
+            .then(toolUse("e2", "create_file", args(Map.of("repo", "api", "path", TEST, "content", testFileContent)), 100, 10))
+            .then(toolUse("f", "finish_implementation", args(Map.of("summary", "done")), 100, 10));
+        String run = start("FIX_AND_PATCH");
+        approve(run);
+        awaitStatus(run, "AWAITING_REVIEW");
+        return run;
+    }
+
+    @Test
+    void aFinishedChangeExportsAsAGitAmPatchThatReproducesTheEditOnAFreshCheckout() throws Exception {
+        String run = runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
+        String view = api.get(u("viewer"), "/api/v1/runs/" + run + "/export").andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<String>read(view, "$.branchName")).startsWith("devforge/" + run.substring(0, 8) + "-filter-the-videos-by-role");
+        assertThat(JsonPath.<Boolean>read(view, "$.blocked")).isFalse();
+        assertThat(JsonPath.<List<String>>read(view, "$.warnings")).isEmpty();
+        String pr = JsonPath.read(view, "$.prDescription");
+        assertThat(pr).contains("## How it was checked").contains("4 test(s)").contains("`api:" + BO + ":6-7`").contains("Out of scope").contains("approved by a person");
+        String changeId = JsonPath.read(view, "$.repositories[0].changeId");
+        String fileName = JsonPath.read(view, "$.repositories[0].patchFileName");
+
+        var res = api.get(u("viewer"), "/api/v1/runs/" + run + "/changes/" + changeId + "/export.patch").andExpect(status().isOk()).andReturn().getResponse();
+        assertThat(res.getHeader("Content-Disposition")).contains("attachment").contains(fileName);
+        Path patchFile = tmp.resolve("export.patch");
+        java.nio.file.Files.writeString(patchFile, res.getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        FixtureRepos.git(tmp, "clone", "-q", tmp.resolve("backend").toString(), "fresh");
+        FixtureRepos.git(tmp.resolve("fresh"), "-c", "user.name=Committer", "-c", "user.email=c@example.test", "am", patchFile.toString());
+        assertThat(FixtureRepos.git(tmp.resolve("fresh"), "log", "-1", "--format=%ae|%s")).startsWith(u("owner") + "|").contains("Filter the videos by role in the BO");
+        assertThat(java.nio.file.Files.readString(tmp.resolve("fresh").resolve(BO))).contains("\"admin\".equals(role)");
+        assertThat(java.nio.file.Files.exists(tmp.resolve("fresh").resolve(TEST))).isTrue();
+        assertThat(FixtureRepos.git(tmp.resolve("fresh"), "status", "--porcelain")).isBlank();
+        assertThat(FixtureRepos.git(tmp.resolve("backend"), "status", "--porcelain")).as("the original checkout is untouched").isBlank();
+        api.get(u("outsider"), "/api/v1/runs/" + run + "/export").andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aPatchWithACredentialIsNeverExported() throws Exception {
+        String run = runToReview("class T { String k = \"AKIAABCDEFGHIJKLMNOP\"; String pw = \"password=hunter2hunter2\"; }\n");
+        String view = api.get(u("owner"), "/api/v1/runs/" + run + "/export").andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<Boolean>read(view, "$.blocked")).isTrue();
+        assertThat(JsonPath.<Boolean>read(view, "$.repositories[0].downloadable")).isFalse();
+        assertThat(JsonPath.<List<String>>read(view, "$.repositories[0].secrets[*].rule")).contains("AWS access key", "credential assignment");
+        assertThat(view).doesNotContain("AKIAABCDEFGHIJKLMNOP").doesNotContain("hunter2");
+        api.get(u("owner"), "/api/v1/runs/" + run + "/changes/" + JsonPath.read(view, "$.repositories[0].changeId") + "/export.patch").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("SECRET_IN_PATCH"));
+    }
+
+    @Test
+    void nothingIsExportedBeforeTheChangeIsPrepared() throws Exception {
+        findings().then(toolUse("p", "submit_proposal", proposal(TEST, true), 100, 10));
+        String run = start("FIX_AND_PATCH");
+        awaitStatus(run, "AWAITING_APPROVAL");
+        api.get(u("owner"), "/api/v1/runs/" + run + "/export").andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("NOT_READY_TO_EXPORT"));
+    }
 }

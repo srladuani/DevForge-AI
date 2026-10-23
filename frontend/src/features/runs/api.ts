@@ -128,3 +128,23 @@ export function usePreviewTicket(workspaceId: string) {
     mutationFn: (key: string) => unwrap(client.GET('/api/v1/workspaces/{workspaceId}/tickets/{key}', { params: { path: { workspaceId, key } } })),
   })
 }
+
+export type ExportPlan = Schemas['ExportView']
+
+/** Branch name, patch files and PR text for a finished change. Local only: nothing is pushed anywhere. */
+export function useExport(runId: string, enabled: boolean) {
+  return useQuery({ queryKey: [...runKeys.one(runId), 'export'], enabled: enabled && runId !== '', queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/export', { params: { path: { id: runId } } })) })
+}
+
+/** The patch is fetched with the caller's identity (a plain link would not carry it) and saved as a file. */
+export async function downloadPatch(runId: string, changeId: string, fileName: string): Promise<void> {
+  const email = currentUserEmail()
+  const res = await globalThis.fetch(`/api/v1/runs/${runId}/changes/${changeId}/export.patch`, { headers: email ? { 'X-Devforge-User': email } : {} })
+  if (!res.ok) throw new Error(res.status === 422 ? 'This patch cannot be exported because it appears to contain a credential.' : 'The patch could not be downloaded.')
+  const url = URL.createObjectURL(await res.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}

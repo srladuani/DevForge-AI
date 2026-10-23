@@ -37,4 +37,16 @@ public final class RunViews {
     public record ValidationView(UUID id, UUID codeChangeId, String repoName, @Nullable String command, String status, String summary, int attempt) {}
 
     public record ChangeView(UUID id, UUID repositoryId, String repoName, String baseSha, String patch, String patchHash, List<String> files, boolean simulated, int attempt) {}
+
+    /** A possible credential in the added lines of a patch. {@code BLOCK} findings stop the export; {@code WARN} ones are shown for the reviewer. The value itself is never included. */
+    public record SecretFinding(String file, String rule, String severity) {}
+
+    public record ExportRepoView(UUID changeId, String repoName, String branch, String commitSubject, List<String> files, String patchFileName, @Nullable String validationStatus,
+                                 List<SecretFinding> secrets, boolean downloadable) {}
+
+    /**
+     * Everything needed to take a finished change out of DevForge without any Git host: a branch name, a {@code git am}-able patch per repository and a
+     * traceable pull-request description. Nothing is pushed anywhere.
+     */
+    public record ExportView(UUID runId, String branchName, String prDescription, List<ExportRepoView> repositories, List<String> warnings, boolean blocked) {}
 }

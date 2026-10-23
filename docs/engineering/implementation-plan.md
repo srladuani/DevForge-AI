@@ -70,7 +70,7 @@ All tasks delivered except where noted. Evidence: backend **114 tests** (real Po
 | 1.8 API | OpenAPI snapshot gate + response-conformance test; 37/43 schemas declare required fields |
 | 1.9 frontend | everything listed in the task, plus admin providers/audit pages |
 
-**Deviations from the design (decided during build):** (1) persistence uses `JdbcClient` + records, not JPA (ADR-0005 note); (2) Modulith convention: a module's *root package* is its public API and `internal` is hidden (not an `api/` subpackage); (3) TypeScript pinned to 5.9 because `openapi-typescript` does not yet support 6; (4) oxlint instead of ESLint; (5) default backend port 8787 (8080/9090 are commonly taken).
+**Deviations from the design (decided during build):** (1) persistence uses `JdbcClient` + records, not JPA (ADR-0005 note); (2) Modulith convention: a module's *root package* is its public API and `internal` is hidden (not an `api/` subpackage); (3) TypeScript pinned to 5.9 because `openapi-typescript` does not yet support 6; (4) oxlint instead of ESLint; (5) default backend port 9090 (8080/9090 are commonly taken).
 
 **Known limitations of M1 (by design or not yet done):**
 - The agent is a **simulation**: no model, no Jira, no sandbox execution, no PR. Validation results are `SIMULATED` ("not executed"), never `PASSED`. `PR_PREPARATION` exists in the state machine but no path reaches it.
@@ -129,6 +129,16 @@ OpenAI and Gemini adapters via `integration-adapter` skill; catalog tiers; capab
 
 ## M4 — Fix proposal → approval → implementation → validation · 4-6 wks
 4.1 `fix-planner` profile + FixProposal schema · 4.2 approval gating UI/flow (IMPLEMENT) · 4.3 worktree edit tools (`applyEdit`), patch + hash · 4.4 `Sandbox` Docker adapter (conformance tests EXEC-1), deps-warm step, command allowlist from repo profile · 4.5 `ValidationRun` parsing (JUnit XML/karma/npm output), fix-retry loop (≤2) · 4.6 `reviewer` profile + diff-review step · 4.7 multi-repo change sets (one worktree/branch/validation per repo, cross-repo ordering e.g. backend first) · 4.8 UI: per-repo diff viewer, validation results, changes-requested loop. **Accept:** ≥3 golden bugs patched with sandbox-validated tests; no network in sandbox proven; no write without approval proven.
+
+### M5 status — host-independent part built (2026-10-23); the Git-host adapter is **not started** (needs the Git host decision, Q4)
+| Task | Result |
+|---|---|
+| 5.1 branch/commit | Without writing to anyone's checkout: a suggested branch name (`devforge/<ticket>-<slug>`), a `git am` mbox patch per repository authored by the run owner (subject with ticket key, summary, `Refs:`, check result, `Generated-by` trailer). A test applies it with real `git am` on a fresh clone and gets the same tree |
+| 5.2b patch export | `GET /runs/{id}/export` (plan + warnings) and `GET /runs/{id}/changes/{id}/export.patch` (download); available once the change awaits review or is accepted; simulated changes are refused |
+| 5.3 secret scan | patch lines added are scanned; credentials (private keys, sk-/AKIA/ghp_/xox/AIza/bearer tokens, secret-by-name files) block the export, credential-looking assignments warn; findings name file and rule, never the value |
+| 5.4 PR description | deterministic (no model): problem and cause with verified evidence cites, changes, a checks table that says "not run" when nothing ran, review notes, out of scope |
+| UI | "Take this change with you" panel: branch, per-repo download and `git switch -c … / git am …` commands, copyable PR text, warnings |
+| 5.2 OAuth, `PullRequestProvider` adapter, push/PR approval, intent-record idempotency | **Not built** (waiting on Q4: which Git host first) |
 
 ## M5 — Branch + patch + PR adapter · 2-3 wks
 5.1 Branch/commit service (safe naming, protected-branch denylist, no force) · 5.2 OAuth flow for the first Git host (after PAT works) · 5.2b branch/patch export (host-independent, ships first) then `PullRequestProvider` adapter for the host chosen in Q4 (others later) · 5.3 push/PR approval flow bound to patch hash + secret scan of diff · 5.4 PR description generator (traceable: ticket, evidence, real test results) · 5.5 intent-record idempotency for push/PR. **Accept:** branch + patch produced per repo with no host configured; with an adapter, PR created on a test repo after approval; rejected push handled; retry doesn't duplicate.

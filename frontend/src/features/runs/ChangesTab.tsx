@@ -5,6 +5,7 @@ import { errorMessage } from '../../lib/api/client'
 import { shortHash } from '../../lib/format'
 import { useChanges, useValidations, type Change, type Validation } from './api'
 import { DiffView } from './DiffView'
+import { ExportPanel } from './ExportPanel'
 import { SimulatedBadge } from './RunBadges'
 
 const VALIDATION: Record<string, { label: string; tone: Tone }> = {
@@ -14,7 +15,7 @@ const VALIDATION: Record<string, { label: string; tone: Tone }> = {
   SIMULATED: { label: 'Not executed (simulated)', tone: 'sim' },
 }
 
-export function ChangesTab({ runId }: { runId: string }) {
+export function ChangesTab({ runId, exportable }: { runId: string; exportable: boolean }) {
   const changes = useChanges(runId)
   const validations = useValidations(runId)
   if (changes.isPending || validations.isPending) return <Spinner label="Loading changes" />
@@ -28,6 +29,7 @@ export function ChangesTab({ runId }: { runId: string }) {
       <Alert tone="info">
         These are patches for review. Nothing has been applied to any repository on disk, committed, or pushed.
       </Alert>
+      {exportable && <ExportPanel runId={runId} changes={changes.data.filter((c) => c.attempt === attempts[0])} />}
       {attempts.map((attempt, idx) => (
         <section key={attempt} aria-label={`Attempt ${attempt}`}>
           <details open={idx === 0} className="space-y-3">

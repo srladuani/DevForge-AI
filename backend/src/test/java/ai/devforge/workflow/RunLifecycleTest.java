@@ -62,6 +62,7 @@ class RunLifecycleTest extends WorkflowTestBase {
         assertThat(JsonPath.<List<String>>read(validations, "$[*].status")).isNotEmpty().allMatch(s -> s.equals("SIMULATED")).doesNotContain("PASSED");
         assertThat(JsonPath.<List<String>>read(validations, "$[*].summary")).allMatch(s -> s.contains("NOT executed") || s.contains("No test command"));
 
+        api.get(u("owner"), "/api/v1/runs/" + run + "/export").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("SIMULATED_CHANGE"));
         act(u("owner"), run, "accept", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("COMPLETED"));
         assertThat(statesVisited(run)).endsWith("IMPLEMENTATION", "VALIDATION", "AWAITING_REVIEW", "COMPLETED");
         assertThat(eventTypes(run)).contains("APPROVAL_REQUESTED", "APPROVAL_DECIDED", "CHANGE_PREPARED", "VALIDATION_RESULT");

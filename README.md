@@ -28,7 +28,7 @@ Details and known gaps: [`docs/engineering/implementation-plan.md`](docs/enginee
 Prerequisites: JDK 21, Node 22+, Docker.
 
 ```bash
-scripts/dev.sh          # database + backend (127.0.0.1:8787) + UI (http://localhost:5173)
+scripts/dev.sh          # database + backend (127.0.0.1:9090) + UI (http://localhost:8080)
 scripts/dev.sh logs     # follow the backend log
 scripts/dev.sh stop
 ```

@@ -11,8 +11,8 @@ spring:
     default-property-inclusion: non_null
 
 server:
-  # 8787 rather than 8080: 8080 and 9090 are commonly taken by other local dev servers.
-  port: ${DEVFORGE_PORT:8787}
+  # 9090 rather than 8080: 8080 and 9090 are commonly taken by other local dev servers.
+  port: ${DEVFORGE_PORT:9090}
   error:
     include-message: never
     include-stacktrace: never

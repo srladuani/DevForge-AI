@@ -542,6 +542,77 @@
         "required" : [ "endLine", "id", "path", "repoName", "repositoryId", "sha", "startLine", "verified" ],
         "type" : "object"
       },
+      "ExportRepoView" : {
+        "properties" : {
+          "branch" : {
+            "type" : "string"
+          },
+          "changeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "commitSubject" : {
+            "type" : "string"
+          },
+          "downloadable" : {
+            "type" : "boolean"
+          },
+          "files" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "patchFileName" : {
+            "type" : "string"
+          },
+          "repoName" : {
+            "type" : "string"
+          },
+          "secrets" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SecretFinding"
+            },
+            "type" : "array"
+          },
+          "validationStatus" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "branch", "changeId", "commitSubject", "downloadable", "files", "patchFileName", "repoName", "secrets" ],
+        "type" : "object"
+      },
+      "ExportView" : {
+        "properties" : {
+          "blocked" : {
+            "type" : "boolean"
+          },
+          "branchName" : {
+            "type" : "string"
+          },
+          "prDescription" : {
+            "type" : "string"
+          },
+          "repositories" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExportRepoView"
+            },
+            "type" : "array"
+          },
+          "runId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "warnings" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "blocked", "branchName", "prDescription", "repositories", "runId", "warnings" ],
+        "type" : "object"
+      },
       "FailureView" : {
         "properties" : {
           "code" : {
@@ -975,6 +1046,21 @@
           }
         },
         "required" : [ "agent", "cancelRequested", "createdAt", "id", "incomplete", "inputTokens", "inputs", "mode", "nextActions", "outputTokens", "ownerUserId", "repositories", "status", "title", "type", "updatedAt", "workspaceId" ],
+        "type" : "object"
+      },
+      "SecretFinding" : {
+        "properties" : {
+          "file" : {
+            "type" : "string"
+          },
+          "rule" : {
+            "type" : "string"
+          },
+          "severity" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "file", "rule", "severity" ],
         "type" : "object"
       },
       "SetMemberRequest" : {
@@ -1863,6 +1949,42 @@
         "tags" : [ "run-controller" ]
       }
     },
+    "/api/v1/runs/{id}/changes/{changeId}/export.patch" : {
+      "get" : {
+        "operationId" : "patch",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "changeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "format" : "byte",
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "export-controller" ]
+      }
+    },
     "/api/v1/runs/{id}/events" : {
       "get" : {
         "operationId" : "stream",
@@ -1912,6 +2034,33 @@
           }
         },
         "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/export" : {
+      "get" : {
+        "operationId" : "export",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ExportView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "export-controller" ]
       }
     },
     "/api/v1/runs/{id}/findings" : {

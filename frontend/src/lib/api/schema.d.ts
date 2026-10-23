@@ -244,6 +244,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/runs/{id}/changes/{changeId}/export.patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["patch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{id}/events": {
         parameters: {
             query?: never;
@@ -252,6 +268,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/runs/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export"];
         put?: never;
         post?: never;
         delete?: never;
@@ -686,6 +718,27 @@ export interface components {
             startLine: number;
             verified: boolean;
         };
+        ExportRepoView: {
+            branch: string;
+            /** Format: uuid */
+            changeId: string;
+            commitSubject: string;
+            downloadable: boolean;
+            files: string[];
+            patchFileName: string;
+            repoName: string;
+            secrets: components["schemas"]["SecretFinding"][];
+            validationStatus?: string;
+        };
+        ExportView: {
+            blocked: boolean;
+            branchName: string;
+            prDescription: string;
+            repositories: components["schemas"]["ExportRepoView"][];
+            /** Format: uuid */
+            runId: string;
+            warnings: string[];
+        };
         FailureView: {
             code: string;
             message: string;
@@ -836,6 +889,11 @@ export interface components {
             updatedAt: string;
             /** Format: uuid */
             workspaceId: string;
+        };
+        SecretFinding: {
+            file: string;
+            rule: string;
+            severity: string;
         };
         SetMemberRequest: {
             email: string;
@@ -1399,6 +1457,29 @@ export interface operations {
             };
         };
     };
+    patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                changeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     stream: {
         parameters: {
             query?: {
@@ -1422,6 +1503,28 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["EventView"][];
                     "text/event-stream": components["schemas"]["SseEmitter"];
+                };
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExportView"];
                 };
             };
         };

@@ -217,4 +217,34 @@ describe('Run page', () => {
     await user.click(screen.getByText('Show the end of the output'))
     expect(screen.getByText(/AssertionError: expected 1/)).toBeVisible()
   })
+
+  it('offers the patch download, the git commands and the PR text for a real change, and blocks a patch with a credential', async () => {
+    const r = setup({ run: run({ status: 'AWAITING_REVIEW', mode: 'FIX_AND_PATCH', agent: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', simulated: false }, nextActions: ['accept', 'cancel'] }) })
+    const change = { id: 'c1', repositoryId: ids.backend, repoName: 'api', baseSha: 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0', patch: '--- a/X.java\n+++ b/X.java\n@@ -1 +1 @@\n-old\n+new\n', patchHash: 'sha256:1', files: ['X.java'], simulated: false, attempt: 1 }
+    const plan = (blocked: boolean) => ({
+      runId: r.id, branchName: 'devforge/pbx-7-filter-videos', prDescription: '# PBX-7: Filter videos\n\n## How it was checked', blocked,
+      warnings: blocked ? ['api: the patch appears to contain a credential, so it cannot be exported.'] : ['api: the check result is not run; review the change with extra care'],
+      repositories: [{ changeId: 'c1', repoName: 'api', branch: 'devforge/pbx-7-filter-videos', commitSubject: 'PBX-7: Filter videos', files: ['X.java'], patchFileName: 'devforge-pbx-7-api.patch', validationStatus: blocked ? 'PASSED' : 'NOT_RUN', secrets: blocked ? [{ file: 'X.java', rule: 'AWS access key', severity: 'BLOCK' }] : [], downloadable: !blocked }],
+    })
+    let blocked = false
+    server.use(
+      http.get(`/api/v1/runs/${r.id}/changes`, () => HttpResponse.json([change])),
+      http.get(`/api/v1/runs/${r.id}/export`, () => HttpResponse.json(plan(blocked))),
+    )
+    const { unmount } = renderApp(`/runs/${ids.run}?tab=changes`)
+    expect(await screen.findByText('Take this change with you')).toBeInTheDocument()
+    expect(screen.getByText('devforge/pbx-7-filter-videos')).toBeInTheDocument()
+    expect(screen.getByText(/the check result is not run/)).toBeInTheDocument()
+    expect(screen.getByText(/git am devforge-pbx-7-api\.patch/)).toBeInTheDocument()
+    expect(screen.getByText(/git switch -c devforge\/pbx-7-filter-videos a1b2c3d4e5f6/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download patch' })).toBeEnabled()
+    expect(screen.getByLabelText('Pull request description')).toHaveValue('# PBX-7: Filter videos\n\n## How it was checked')
+    unmount()
+
+    blocked = true
+    renderApp(`/runs/${ids.run}?tab=changes`)
+    expect(await screen.findByText(/appears to contain a credential/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Download patch' })).toBeDisabled()
+    expect(screen.queryByText(/git am/)).not.toBeInTheDocument()
+  })
 })
