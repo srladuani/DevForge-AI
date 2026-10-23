@@ -22,7 +22,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        # metrics and prometheus need an admin (see SecurityConfig); health and info are public
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
@@ -43,7 +44,19 @@ devforge:
     work-root: ${DEVFORGE_WORK_ROOT:}
     # JDK/Node/build-tool installs the sandbox may see read-only, e.g. a version manager's install directories. Their bin/ is added to PATH.
     # toolchain-mounts: [/opt/node-22, /opt/jdk-21]
+  workflow:
+    # finished runs older than this many days are deleted with everything they produced (0 keeps them)
+    retention-days: ${DEVFORGE_RETENTION_DAYS:0}
+    max-runs-per-user-per-day: ${DEVFORGE_MAX_RUNS_PER_USER_PER_DAY:100}
+    max-tokens-per-user-per-day: ${DEVFORGE_MAX_TOKENS_PER_USER_PER_DAY:5000000}
   security:
+    oidc:
+      # Sign-in with your organisation's OpenID Connect provider. Empty issuer = off (then only the local profile's development sign-in works).
+      issuer-uri: ${DEVFORGE_OIDC_ISSUER_URI:}
+      audience: ${DEVFORGE_OIDC_AUDIENCE:}
+      client-id: ${DEVFORGE_OIDC_CLIENT_ID:}
+      admin-claim: ${DEVFORGE_OIDC_ADMIN_CLAIM:groups}
+      admin-value: ${DEVFORGE_OIDC_ADMIN_VALUE:}
     # Vault master keys by version (base64, 32 bytes). Rotate by adding a new version and raising current-key-version.
     current-key-version: 1
     keys:

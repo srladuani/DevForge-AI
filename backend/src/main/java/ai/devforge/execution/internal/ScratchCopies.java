@@ -15,8 +15,10 @@ import org.springframework.stereotype.Component;
 class ScratchCopies implements WorkCopies {
     private final Path root;
 
-    ScratchCopies(@Value("${devforge.execution.work-root:}") String configured) {
-        this.root = (configured == null || configured.isBlank() ? Path.of(System.getProperty("java.io.tmpdir"), "devforge-work") : Path.of(configured)).toAbsolutePath();
+    ScratchCopies(@Value("${devforge.execution.work-root:}") String configured) { this.root = rootOf(configured); }
+
+    static Path rootOf(String configured) {
+        return (configured == null || configured.isBlank() ? Path.of(System.getProperty("java.io.tmpdir"), "devforge-work") : Path.of(configured)).toAbsolutePath();
     }
 
     @Override

@@ -39,6 +39,32 @@ Untrusted *content*: ticket text, comments, attachments, repo files/READMEs/comm
 
 Repo-supplied instruction files may tighten but never loosen policy (see `repository-analysis.md`). MCP/tool responses may contain appended instructions (observed in M0) and are always data.
 
+## M6 review: where each threat stands (2026-10-24)
+"Tested" means an automated test in this repository fails if the control is removed. "Not verified" means built but only exercised against fakes.
+| # | Status | Evidence / gap |
+|---|---|---|
+| T1 injection | Tested | fencing, owner-only credentials, escape refusals in `InvestigationLoopTest`, `prompt-injection` eval, `RealFixRunTest` (out-of-scope edits refused) |
+| T2 self-escalation | Tested | the implementer may edit only files of the approved proposal (mutation-checked); protected build/CI files only if named; secret files never |
+| T3 hostile code | Partly | bubblewrap: no network outside the dependency step, hidden host paths, scrubbed env, CPU/process/file limits, timeout kills the namespace (`BubblewrapSandboxTest`). **No memory limit; no seccomp profile; Docker backend not built** |
+| T4 supply chain | Partly | dependency step is lockfile-driven with install scripts disabled, **but network is unrestricted (no allow-list proxy)**. `scripts/audit-deps.sh` (osv.dev + npm audit): found and fixed 7 Jackson 2 records on 2026-10-24; run it before releases |
+| T5 credential leakage | Tested | write-only vault, no secrets in events/metrics/responses (`ObservabilityTest`, `RealFixRunTest`), patch secret scan. **No secret scanning in CI (no CI exists)** |
+| T6 code to the provider | Partly | per-project provider allowlist, denylisted files never read, excerpt caps. Provider data-handling terms (Q5) are a business decision, not code |
+| T7 unauthorised access | Tested | `ApiAuthorizationMatrixTest` walks every documented operation: unauthenticated, stranger and non-admin cases, viewer writes |
+| T8 unapproved external write | Tested | publication needs a PR approval bound to the plan hash; branch only, never forced, draft PR; foreign hosts never receive the token |
+| T9 traversal/symlinks | Tested | path jail + symlink fixtures (`WorkCopyTest`, repository tests) |
+| T10 SSRF | Partly | integration URLs come from admin config only; git/API hosts are matched before a token is sent. **Admin-entered base URLs are not restricted to public addresses** (an admin could point a provider at an internal host) |
+| T11 audit tampering | **Not built** | audit rows are append-only by convention in code, not by database permissions or a hash chain |
+| T12 exhaustion | Tested (partly) | per-run limits, per-project concurrency, per-person daily run and token quotas (`RunRetentionTest`); host memory not limited (see T3) |
+| T13 XSS | Partly | rendered as text, no raw HTML in the UI; the API sends a restrictive CSP/no-store (`SecurityHeadersTest`). **The static UI host must set its own CSP** (not part of this repository) |
+| T14 retention | Built | optional run retention (`devforge.workflow.retention-days`), sweeper for work copies and caches; per-workspace deletion API not built |
+| T16 credential theft | Tested | vault encryption/binding, owner checks, `LocalProfileSafetyTest`; OIDC tokens are only held in browser memory |
+| T17 cost abuse | Tested | per-run budgets and per-person daily token/run quotas; spend metric and alert (`devforge_model_tokens_total`) |
+| T18 ToS | Documented | API keys only |
+| T15 Jira writes | Tested | write tools cannot be called (`McpClientTest`) |
+| New: sign-in | Tested / not verified | OIDC bearer validation (issuer, audience, expiry, signature, verified email) and admin sync in `OidcSignInTest`; **not verified against a real provider** |
+
+Remaining security work before a real pilot: verify OIDC against the organisation's provider; decide the audit tamper-evidence level (T11); restrict admin-entered provider URLs (T10); add CI with secret scanning and `scripts/audit-deps.sh`; Docker/seccomp sandbox hardening (T3); set a CSP on whatever serves the UI.
+
 ## Approval matrix
 | Action | Class | Default policy |
 |---|---|---|

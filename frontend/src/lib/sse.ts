@@ -63,7 +63,7 @@ export class SseParser {
 
 export interface StreamOptions {
   url: (afterSeq: number) => string
-  headers: () => Record<string, string>
+  headers: () => Record<string, string> | Promise<Record<string, string>>
   onEvent: (e: RunEvent) => void
   onStatus: (s: 'connecting' | 'live' | 'reconnecting' | 'closed') => void
   fetchImpl?: typeof fetch
@@ -84,7 +84,7 @@ export async function followEvents(opts: StreamOptions, signal: AbortSignal): Pr
   while (!signal.aborted) {
     opts.onStatus(failures === 0 ? 'connecting' : 'reconnecting')
     try {
-      const res = await doFetch(opts.url(last), { headers: { ...opts.headers(), Accept: 'text/event-stream' }, signal })
+      const res = await doFetch(opts.url(last), { headers: { ...(await opts.headers()), Accept: 'text/event-stream' }, signal })
       if (res.status === 401 || res.status === 403 || res.status === 404) {
         opts.onStatus('closed')
         return // not allowed or gone: retrying cannot help

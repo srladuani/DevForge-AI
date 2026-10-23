@@ -45,6 +45,11 @@ class PublicationStore {
 
     void failed(UUID id, String code, String message) { jdbc.sql("update publication set status = 'FAILED', failure_code = ?, failure_message = ?, updated_at = now() where id = ?").params(code, message, id).update(); }
 
+    /** Runs with a publication that is unfinished and has not moved for a while: the process that was carrying it out is gone. */
+    List<UUID> stalledRuns(java.time.Duration idle) {
+        return jdbc.sql("select distinct run_id from publication where status in ('PENDING', 'PUSHED') and updated_at < now() - make_interval(secs => ?)").param(idle.toSeconds()).query(UUID.class).list();
+    }
+
     List<PublicationView> forRun(UUID runId) {
         return jdbc.sql("select change_id, repo_name, status, remote, branch, base_branch, commit_sha, pr_number, pr_url, failure_code, failure_message from publication where run_id = ? order by repo_name").param(runId)
             .query((rs, i) -> new PublicationView(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6), rs.getString(7),

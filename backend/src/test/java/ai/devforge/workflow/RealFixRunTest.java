@@ -388,4 +388,26 @@ class RealFixRunTest extends WorkflowTestBase {
         assertThat(gh.requests().size()).as("no call carried the token anywhere").isEqualTo(before);
         assertThat(pendingApprovals(run)).isZero();
     }
+
+    @Autowired org.springframework.context.ApplicationContext context;
+
+    @Test
+    void aPublicationInterruptedByARestartIsResumedWithoutCreatingAnythingTwice() throws Exception {
+        String run = publishReady();
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isAccepted());
+        decide(u("approver"), pendingApprovalId(run), "APPROVE", pendingApprovalHash(run)).andExpect(status().isOk());
+        awaitPublication(run, "PR_OPEN");
+        String branch = Api.json(api.get(u("owner"), "/api/v1/runs/" + run + "/publications"), "$[0].branch");
+        // what a restart in the middle would have left: unfinished, idle for a while
+        jdbc.sql("update publication set status = 'PENDING', pr_number = null, pr_url = null, updated_at = now() - interval '10 minutes' where run_id = ?").param(java.util.UUID.fromString(run)).update();
+
+        Class<?> publisher = Class.forName("ai.devforge.workflow.internal.Publisher");
+        var m = publisher.getDeclaredMethod("recoverStalled");
+        m.setAccessible(true);
+        m.invoke(context.getBean(publisher));
+        awaitPublication(run, "PR_OPEN");
+        assertThat(gh.pullCreations()).as("the pull request that already existed was reused").hasSize(1);
+        assertThat(FixtureRepos.git(remote, "branch", "--list").lines().filter(l -> !l.isBlank()).count()).isEqualTo(1);
+        assertThat(FixtureRepos.git(remote, "branch", "--list")).contains(branch);
+    }
 }

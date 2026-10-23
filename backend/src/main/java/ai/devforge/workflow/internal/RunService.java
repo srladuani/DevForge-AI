@@ -55,9 +55,13 @@ class RunService {
     private final AuditLog audit;
     private final TransactionTemplate tx;
     private final TicketFetcher tickets;
+    private final WorkflowProperties props;
+    private final io.micrometer.core.instrument.MeterRegistry meters;
 
     RunService(RunStore store, RunDataStore data, JobQueue queue, WorkspaceAccess access, Workspaces workspaces, ProjectTypes projectTypes, Repositories repositories,
-               ModelCatalog catalog, AuditLog audit, TransactionTemplate tx, TicketFetcher tickets) {
+               ModelCatalog catalog, AuditLog audit, TransactionTemplate tx, TicketFetcher tickets, WorkflowProperties props, io.micrometer.core.instrument.MeterRegistry meters) {
+        this.props = props;
+        this.meters = meters;
         this.store = store;
         this.data = data;
         this.queue = queue;
@@ -104,6 +108,7 @@ class RunService {
         WorkspacePolicy policy = workspaces.policy(workspaceId);
         long active = store.jdbc.sql("select count(*) from run where workspace_id = ? and status in ('CREATED','INPUT_RETRIEVAL','CONTEXT_GATHERING','INVESTIGATION','PROPOSING_FIX','IMPLEMENTATION','VALIDATION')")
             .param(workspaceId).query(Long.class).single();
+        checkQuota(user, agent.simulated());
         if (active >= policy.maxConcurrentRuns()) {
             throw new DomainException("TOO_MANY_ACTIVE_RUNS", HttpStatus.TOO_MANY_REQUESTS, "This project already has " + active + " run(s) executing; wait for one to reach a stopping point");
         }
@@ -130,6 +135,7 @@ class RunService {
                 store.appendEvent(runId, "RUN_CREATED", Map.of("mode", cmd.mode().name(), "repositories", repoIds.size(), "provider", agent.provider(), "model", agent.model(), "simulated", agent.simulated()));
                 queue.enqueue(runId, RunStatus.INPUT_RETRIEVAL.name());
                 audit.record(user.id().toString(), "RUN_CREATED", "run", runId.toString(), cmd.mode() + " via " + agent.provider() + "/" + agent.model());
+                meters.counter("devforge.runs.started", "mode", cmd.mode().name(), "simulated", String.valueOf(agent.simulated())).increment();
             });
         } catch (DuplicateKeyException e) {
             var existing = idempotencyKey == null ? null : findByKey(workspaceId, idempotencyKey);
@@ -158,6 +164,23 @@ class RunService {
         m.put("agent", c.agent());
         m.put("notes", c.notes());
         return m;
+    }
+
+    /** Rolling-day limits per person, so one account (or a runaway script) cannot spend without bound. Simulated runs spend nothing and only count as runs. */
+    private void checkQuota(CurrentUser user, boolean simulated) {
+        if (props.maxRunsPerUserPerDay() > 0) {
+            long runs = store.jdbc.sql("select count(*) from run where owner_user_id = ? and created_at > now() - interval '1 day'").param(user.id()).query(Long.class).single();
+            if (runs >= props.maxRunsPerUserPerDay()) {
+                throw new DomainException("QUOTA_EXCEEDED", HttpStatus.TOO_MANY_REQUESTS, "You have started " + runs + " runs in the last 24 hours, which is the daily limit. Try again later.");
+            }
+        }
+        if (props.maxTokensPerUserPerDay() > 0 && !simulated) {
+            long tokens = store.jdbc.sql("select coalesce(sum(input_tokens + output_tokens), 0) from model_call where user_id = ? and not simulated and created_at > now() - interval '1 day'")
+                .param(user.id()).query(Long.class).single();
+            if (tokens >= props.maxTokensPerUserPerDay()) {
+                throw new DomainException("QUOTA_EXCEEDED", HttpStatus.TOO_MANY_REQUESTS, "Your runs used " + tokens + " model tokens in the last 24 hours, which is the daily limit. Try again later.");
+            }
+        }
     }
 
     private static void validateInput(InputRequest in) {

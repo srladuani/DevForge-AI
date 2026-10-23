@@ -35,7 +35,16 @@ class BubblewrapSandbox implements Sandbox {
     private final ExecutionProperties props;
     private volatile Boolean available;
 
-    BubblewrapSandbox(ExecutionProperties props) { this.props = props; }
+    private final io.micrometer.core.instrument.MeterRegistry meters;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    BubblewrapSandbox(ExecutionProperties props, io.micrometer.core.instrument.MeterRegistry meters) {
+        this.props = props;
+        this.meters = meters;
+        io.micrometer.core.instrument.Gauge.builder("devforge.sandbox.available", this, s -> s.available() ? 1 : 0).description("1 if commands can be run isolated, 0 if validation cannot run").register(meters);
+    }
+
+    BubblewrapSandbox(ExecutionProperties props) { this(props, new io.micrometer.core.instrument.simple.SimpleMeterRegistry()); }
 
     @Override public String backend() { return "bubblewrap"; }
 
@@ -63,7 +72,9 @@ class BubblewrapSandbox implements Sandbox {
     @Override
     public SandboxResult run(SandboxSpec spec) {
         if (!available()) throw new SandboxUnavailableException("bubblewrap is not installed or user namespaces are disabled; code is not run without isolation");
-        return execute(spec);
+        SandboxResult r = execute(spec);
+        meters.timer("devforge.sandbox.run", "network", String.valueOf(spec.network()), "outcome", r.timedOut() ? "timeout" : r.exitCode() == 0 ? "ok" : "failed").record(r.duration());
+        return r;
     }
 
     private SandboxResult execute(SandboxSpec spec) {

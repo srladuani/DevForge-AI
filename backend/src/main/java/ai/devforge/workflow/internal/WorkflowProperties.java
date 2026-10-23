@@ -10,7 +10,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param retryBackoffMillis base delay between retries of a transient model failure (multiplied by the attempt number)
  * @param maxModelAttempts   tries for a transient model failure before the step fails
  * @param queueName          the job queue this process serves; workers never claim jobs of another queue
+ * @param retentionDays      finished runs older than this are deleted with everything they produced; 0 keeps them forever
+ * @param maxRunsPerUserPerDay  runs one person may start per rolling day; 0 = unlimited
+ * @param maxTokensPerUserPerDay model tokens (real providers only) one person may spend per rolling day; 0 = unlimited
  */
 @ConfigurationProperties("devforge.workflow")
 record WorkflowProperties(@DefaultValue("2") int concurrency, @DefaultValue("30") int leaseSeconds, @DefaultValue("250") long pollMillis,
-                          @DefaultValue("500") long retryBackoffMillis, @DefaultValue("3") int maxModelAttempts, @DefaultValue("default") String queueName) {}
+                          @DefaultValue("500") long retryBackoffMillis, @DefaultValue("3") int maxModelAttempts, @DefaultValue("default") String queueName,
+                          @DefaultValue("0") int retentionDays, @DefaultValue("100") int maxRunsPerUserPerDay, @DefaultValue("5000000") long maxTokensPerUserPerDay) {}

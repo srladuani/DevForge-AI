@@ -40,9 +40,11 @@ class Publisher {
     private final GitHosts hosts;
     private final Connections connections;
     private final Users users;
+    private final io.micrometer.core.instrument.MeterRegistry meters;
     private final ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 
-    Publisher(PublicationStore publications, RunDataStore data, RunStore store, Repositories repositories, WorkCopies copies, GitHosts hosts, Connections connections, Users users) {
+    Publisher(PublicationStore publications, RunDataStore data, RunStore store, Repositories repositories, WorkCopies copies, GitHosts hosts, Connections connections, Users users, io.micrometer.core.instrument.MeterRegistry meters) {
+        this.meters = meters;
         this.publications = publications;
         this.data = data;
         this.store = store;
@@ -53,14 +55,31 @@ class Publisher {
         this.users = users;
     }
 
+    private final Set<UUID> inFlight = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     void runInBackground(UUID runId) {
+        if (!inFlight.add(runId)) return; // already being carried out by this process
         executor.submit(() -> {
             try {
                 runNow(runId);
             } catch (RuntimeException e) {
                 log.error("Publication of run {} crashed", runId, e);
+            } finally {
+                inFlight.remove(runId);
             }
         });
+    }
+
+    /**
+     * A publication runs on a background thread after approval; if the process stopped meanwhile, nothing would ever finish it. This picks up
+     * unfinished ones that have been idle for a few minutes. Every step is repeatable, so resuming is safe.
+     */
+    @org.springframework.scheduling.annotation.Scheduled(initialDelayString = "PT1M", fixedDelayString = "PT1M")
+    void recoverStalled() {
+        for (UUID runId : publications.stalledRuns(java.time.Duration.ofMinutes(3))) {
+            log.info("Resuming unfinished publication of run {}", runId);
+            runInBackground(runId);
+        }
     }
 
     void runNow(UUID runId) {
@@ -103,6 +122,7 @@ class Publisher {
             PullRequestRef pr = hosts.findOpenPullRequest(plan.hostType(), cred, remote, plan.branch()).orElseGet(() -> openOrFind(plan, cred, remote, repo));
             publications.prOpen(p.id(), pr.number(), pr.url());
             store.appendEvent(run.id(), "PULL_REQUEST_OPENED", Map.of("repository", repo.repoName(), "number", pr.number(), "url", pr.url()));
+            meters.counter("devforge.publications", "outcome", "pr_opened").increment();
         } catch (GitHostException e) {
             fail(run, p, switch (e.kind()) { case AUTH_INVALID -> "HOST_AUTH"; case NOT_FOUND -> "HOST_NOT_FOUND"; case REJECTED -> "HOST_REJECTED"; case UNAVAILABLE -> "HOST_UNAVAILABLE"; case UNSUPPORTED_REMOTE -> "HOST_REMOTE"; }, e.getMessage());
         } catch (WorkCopy.PushRejected e) {
@@ -129,6 +149,7 @@ class Publisher {
     private void fail(RunRow run, PublicationStore.Row p, String code, String message) {
         String safe = Redactor.redact(message);
         publications.failed(p.id(), code, safe);
+        meters.counter("devforge.publications", "outcome", "failed", "code", code).increment();
         store.appendEvent(run.id(), "PUBLISH_FAILED", Map.of("repository", p.repoName(), "code", code, "message", safe));
     }
 }

@@ -116,6 +116,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/connections": {
         parameters: {
             query?: never;
@@ -651,6 +667,12 @@ export interface components {
             targetType?: string;
             /** Format: date-time */
             ts: string;
+        };
+        AuthConfig: {
+            clientId: string;
+            issuer: string;
+            mode: string;
+            scopes: string[];
         };
         BuildTool: {
             buildCommand?: string;
@@ -1297,6 +1319,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ApprovalView"];
+                };
+            };
+        };
+    };
+    config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuthConfig"];
                 };
             };
         };

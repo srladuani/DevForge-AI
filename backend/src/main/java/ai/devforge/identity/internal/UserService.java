@@ -33,6 +33,16 @@ class UserService implements Users {
             .query(UserService::map).single();
     }
 
+    /** Sign-in through the organisation's identity provider: it is the authority, so the admin flag follows the token in both directions. */
+    CurrentUser syncFromIdentityProvider(String email, String displayName, boolean admin) {
+        return jdbc.sql("""
+                insert into app_user (id, email, display_name, admin) values (?, lower(?), ?, ?)
+                on conflict (email) do update set admin = excluded.admin, display_name = excluded.display_name
+                returning id, email, display_name, admin""")
+            .params(UUID.randomUUID(), email, displayName, admin)
+            .query(UserService::map).single();
+    }
+
     private static CurrentUser map(java.sql.ResultSet rs, int i) throws java.sql.SQLException {
         return new CurrentUser(rs.getObject("id", UUID.class), rs.getString("email"), rs.getString("display_name"), rs.getBoolean("admin"));
     }

@@ -1,5 +1,5 @@
 import createClient, { type Middleware } from 'openapi-fetch'
-import { currentUserEmail } from '../session'
+import { authorizationHeaders, sessionExpired } from '../auth'
 import type { components, paths } from './schema'
 
 export type Schemas = components['schemas']
@@ -35,10 +35,13 @@ export function toApiError(status: number, body: unknown): ApiError {
 }
 
 const withIdentity: Middleware = {
-  onRequest({ request }) {
-    const email = currentUserEmail()
-    if (email) request.headers.set('X-Devforge-User', email)
+  async onRequest({ request }) {
+    for (const [name, value] of Object.entries(await authorizationHeaders())) request.headers.set(name, value)
     return request
+  },
+  onResponse({ response }) {
+    if (response.status === 401) sessionExpired()
+    return response
   },
 }
 

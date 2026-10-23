@@ -1,12 +1,25 @@
+import { useEffect } from 'react'
 import { NavLink, Outlet, Link } from 'react-router'
 import { Button } from '../components/ui/Button'
 import { SignInDev } from '../features/auth/SignInDev'
+import { Spinner } from '../components/ui/Alert'
+import { signInWithProvider, signOutFromProvider, useAuthMode, useProviderUser } from '../lib/auth'
 import { signOut, useUserEmail } from '../lib/session'
 
 const nav = 'rounded-md px-3 py-1.5 text-sm font-medium text-muted hover:bg-surface-2 hover:text-text aria-[current=page]:bg-surface-2 aria-[current=page]:text-text'
 
 export function Layout() {
-  const email = useUserEmail()
+  const devEmail = useUserEmail()
+  const mode = useAuthMode()
+  const provider = useProviderUser()
+  const oidc = mode === 'OIDC'
+  const needsProviderSignIn = oidc && provider === null
+  useEffect(() => {
+    if (needsProviderSignIn) void signInWithProvider()
+  }, [needsProviderSignIn])
+  if (needsProviderSignIn) return <Spinner label="Signing you in" />
+  if (mode === 'NONE') return <p className="mx-auto mt-24 max-w-md text-sm">This server has no sign-in configured. Ask an administrator to set up single sign-on.</p>
+  const email = oidc ? (provider?.profile.email ?? provider?.profile.name ?? 'signed in') : devEmail
   if (!email) return <SignInDev />
   return (
     <div className="min-h-screen md:grid md:grid-cols-[14rem_1fr]">
@@ -35,10 +48,10 @@ export function Layout() {
           </NavLink>
         </nav>
         <div className="mt-auto hidden space-y-2 border-t border-border pt-3 text-xs text-muted md:block">
-          <p className="break-all" title="Signed in (local development sign-in)">
+          <p className="break-all" title={oidc ? 'Signed in with your organisation account' : 'Signed in (local development sign-in)'}>
             {email}
           </p>
-          <Button variant="ghost" onClick={signOut}>
+          <Button variant="ghost" onClick={oidc ? () => void signOutFromProvider() : signOut}>
             Sign out
           </Button>
         </div>

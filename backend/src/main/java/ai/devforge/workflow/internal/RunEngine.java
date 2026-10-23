@@ -34,8 +34,10 @@ class RunEngine {
     private final AuditLog audit;
     private final TransactionTemplate tx;
     private final WorkflowProperties props;
+    private final io.micrometer.core.instrument.MeterRegistry meters;
 
-    RunEngine(RunStore store, RunDataStore data, JobQueue queue, List<StepHandler> handlerList, Approvals approvals, AuditLog audit, TransactionTemplate tx, WorkflowProperties props) {
+    RunEngine(RunStore store, RunDataStore data, JobQueue queue, List<StepHandler> handlerList, Approvals approvals, AuditLog audit, TransactionTemplate tx, WorkflowProperties props, io.micrometer.core.instrument.MeterRegistry meters) {
+        this.meters = meters;
         this.store = store;
         this.data = data;
         this.queue = queue;
@@ -73,7 +75,9 @@ class RunEngine {
             store.interruptStaleSteps(runId, stepName);
             int base = store.countSteps(runId, stepName);
             UUID stepId = store.startStep(runId, stepName, base + 1);
+            long startedNanos = System.nanoTime();
             Outcome outcome = runWithRetries(runId, handler, base);
+            meters.timer("devforge.step.duration", "step", stepName, "outcome", outcome.stepStatus()).record(System.nanoTime() - startedNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
             RunRow after = store.get(runId);
             if (after.cancelRequested()) {
                 store.finishStep(runId, stepId, stepName, "CANCELLED", "cancelled while running");

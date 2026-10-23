@@ -42,6 +42,7 @@ class SandboxValidator implements Validator {
         if (!sandbox.available()) return ValidationReport.notRun("No sandbox is available on this server, so no repository code was run");
         try {
             Files.createDirectories(cacheDir);
+            Files.setLastModifiedTime(cacheDir, java.nio.file.attribute.FileTime.from(java.time.Instant.now())); // marks the cache as in use for the sweeper
             if (req.tool().equals("gradle")) Files.writeString(cacheDir.resolve("resolve-all.gradle"), GRADLE_RESOLVE_ALL);
             if (cancelled.getAsBoolean()) return ValidationReport.notRun("Cancelled before the tests ran");
             String cd = req.root() == null || req.root().isBlank() ? "" : "cd '" + req.root().replace("'", "") + "' && ";

@@ -32,10 +32,12 @@ class RunDataStore {
 
     private final JdbcClient jdbc;
     private final JsonMapper json;
+    private final io.micrometer.core.instrument.MeterRegistry meters;
 
-    RunDataStore(JdbcClient jdbc, JsonMapper json) {
+    RunDataStore(JdbcClient jdbc, JsonMapper json, io.micrometer.core.instrument.MeterRegistry meters) {
         this.jdbc = jdbc;
         this.json = json;
+        this.meters = meters;
     }
 
     // ---- inputs and repos
@@ -178,6 +180,9 @@ class RunDataStore {
     void addModelCall(UUID runId, String step, UUID userId, String provider, String model, long in, long out, BigDecimal cost, boolean simulated) {
         jdbc.sql("insert into model_call (id, run_id, step, user_id, provider, model, input_tokens, output_tokens, cost_usd, simulated) values (?,?,?,?,?,?,?,?,?,?)")
             .params(UUID.randomUUID(), runId, step, userId, provider, model, in, out, cost, simulated).update();
+        String sim = String.valueOf(simulated);
+        meters.counter("devforge.model.tokens", "provider", provider, "direction", "input", "simulated", sim).increment(in);
+        meters.counter("devforge.model.tokens", "provider", provider, "direction", "output", "simulated", sim).increment(out);
     }
 
     // ---- idempotent re-runs: a step that is executed again after a crash replaces its own earlier output

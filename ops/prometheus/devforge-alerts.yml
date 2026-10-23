@@ -1,0 +1,31 @@
+# Alert rules for a Prometheus that scrapes /actuator/prometheus (needs an admin credential; see docs/engineering/runbook.md).
+groups:
+  - name: devforge
+    rules:
+      - alert: DevForgeDown
+        expr: up{job="devforge"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations: { summary: "DevForge backend is not answering scrapes" }
+      - alert: DevForgeJobsStuck
+        expr: devforge_jobs_oldest_queued_seconds > 300
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "A job has waited more than 5 minutes for a worker", description: "Workers are stuck, crashed or too few. See runbook: 'Runs are not progressing'." }
+      - alert: DevForgeSandboxUnavailable
+        expr: devforge_sandbox_available == 0
+        for: 10m
+        labels: { severity: ticket }
+        annotations: { summary: "The sandbox cannot run commands, so validation reports 'not run'", description: "bubblewrap missing or user namespaces disabled. See runbook: 'Sandbox'." }
+      - alert: DevForgeStepFailures
+        expr: sum(increase(devforge_step_duration_seconds_count{outcome="FAILED"}[30m])) > 5
+        labels: { severity: ticket }
+        annotations: { summary: "More than 5 workflow steps failed in 30 minutes" }
+      - alert: DevForgePublicationFailures
+        expr: sum(increase(devforge_publications_total{outcome="failed"}[1h])) > 3
+        labels: { severity: ticket }
+        annotations: { summary: "Publications to the Git host keep failing", description: "Check the 'code' label: HOST_AUTH (tokens), HOST_UNAVAILABLE (GitHub), BRANCH_EXISTS." }
+      - alert: DevForgeTokenSpend
+        expr: sum(increase(devforge_model_tokens_total{simulated="false"}[1h])) > 2000000
+        labels: { severity: ticket }
+        annotations: { summary: "More than 2M real model tokens in an hour", description: "Per-person daily limits apply; check who is spending (audit log)." }

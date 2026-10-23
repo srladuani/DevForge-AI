@@ -220,6 +220,27 @@
         "required" : [ "action", "actor", "id", "ts" ],
         "type" : "object"
       },
+      "AuthConfig" : {
+        "properties" : {
+          "clientId" : {
+            "type" : "string"
+          },
+          "issuer" : {
+            "type" : "string"
+          },
+          "mode" : {
+            "type" : "string"
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "clientId", "issuer", "mode", "scopes" ],
+        "type" : "object"
+      },
       "BuildTool" : {
         "properties" : {
           "buildCommand" : {
@@ -1724,6 +1745,24 @@
           }
         },
         "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/v1/auth/config" : {
+      "get" : {
+        "operationId" : "config",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuthConfig"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-config-controller" ]
       }
     },
     "/api/v1/me/connections" : {

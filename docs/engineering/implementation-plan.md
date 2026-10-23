@@ -152,6 +152,17 @@ OpenAI and Gemini adapters via `integration-adapter` skill; catalog tiers; capab
 ## M6 — Hardening and pilot · 3-5 wks
 Resource limits/quotas and sweepers, retention jobs, observability dashboards, OIDC, security review (threat-model walk-through, dependency/SAST gates), eval expansion (≥20 cases) and nightly live runs, docs/runbook, pilot with 2-3 engineers on real tickets; collect acceptance metrics from `phase-1-requirements.md`.
 
+### M6 status — in progress (2026-10-24): operations and security slices built; pilot not started
+| Item | Result |
+|---|---|
+| Quotas | per-person rolling-day limits on runs and (real-provider) tokens → HTTP 429 `QUOTA_EXCEEDED`; configurable |
+| Sweepers / retention | work-copy and dependency-cache sweeper; optional finished-run retention (cascade delete, audited); interrupted publications resume automatically |
+| Observability | Micrometer + Prometheus (`/actuator/prometheus`, admin only): runs by status, queue depth and oldest wait, step durations, tokens, publications, sandbox runs/availability; alert rules and a Grafana dashboard in `ops/` (syntax-validated only) |
+| Runbook | `docs/engineering/runbook.md` |
+| Security review | threat-model walk-through with honest status per threat; API-wide authorization matrix test; admin endpoints checked before bodies are read; API security headers/CSP; dependency audit script (found and fixed 7 Jackson records) |
+| OIDC | API validates bearer tokens from any OpenID Connect provider (lazy decoder, audience, verified email, admin sync); browser sign-in with authorization code + PKCE (in-memory tokens, refresh tokens if issued); public `/api/v1/auth/config`. **Not verified against a real provider** |
+| Not done | eval expansion to ≥20 cases and nightly live runs; the pilot with 2–3 engineers and acceptance metrics; CI pipeline (secret scan, `audit-deps`); items in the threat-model "remaining" list |
+
 ## Cross-cutting tasks
 CI pipeline; secret/dependency scanning; docs & ADR upkeep; skills refresh from lessons learned.
 

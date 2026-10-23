@@ -7,9 +7,11 @@ import { ProjectPage } from '../features/projects/ProjectPage'
 import { ProjectsPage } from '../features/projects/ProjectsPage'
 import { NewRunPage } from '../features/runs/NewRunPage'
 import { RunPage } from '../features/runs/RunPage'
+import { AuthCallback } from '../features/auth/AuthCallback'
 import { Layout, NotFound } from './Layout'
 
 export const routes: RouteObject[] = [
+  { path: 'auth/callback', element: <AuthCallback /> },
   {
     element: <Layout />,
     children: [

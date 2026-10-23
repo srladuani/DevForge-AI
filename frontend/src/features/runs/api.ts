@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { client, unwrap, type Schemas } from '../../lib/api/client'
-import { currentUserEmail } from '../../lib/session'
+import { authorizationHeaders } from '../../lib/auth'
 import { followEvents, type RunEvent } from '../../lib/sse'
 
 export type Run = Schemas['RunView']
@@ -97,12 +97,7 @@ export function useRunEvents(runId: string): { events: RunEvent[]; status: Strea
     void followEvents(
       {
         url: (after) => new URL(`/api/v1/runs/${runId}/events?after=${after}`, window.location.origin).toString(),
-        headers: () => {
-          const h: Record<string, string> = {}
-          const email = currentUserEmail()
-          if (email) h['X-Devforge-User'] = email
-          return h
-        },
+        headers: () => authorizationHeaders(),
         onEvent: (e) => {
           setState((prev) => {
             const base = prev.runId === runId ? prev : { runId, events: [], status: prev.status }
@@ -138,8 +133,7 @@ export function useExport(runId: string, enabled: boolean) {
 
 /** The patch is fetched with the caller's identity (a plain link would not carry it) and saved as a file. */
 export async function downloadPatch(runId: string, changeId: string, fileName: string): Promise<void> {
-  const email = currentUserEmail()
-  const res = await globalThis.fetch(`/api/v1/runs/${runId}/changes/${changeId}/export.patch`, { headers: email ? { 'X-Devforge-User': email } : {} })
+  const res = await globalThis.fetch(`/api/v1/runs/${runId}/changes/${changeId}/export.patch`, { headers: await authorizationHeaders() })
   if (!res.ok) throw new Error(res.status === 422 ? 'This patch cannot be exported because it appears to contain a credential.' : 'The patch could not be downloaded.')
   const url = URL.createObjectURL(await res.blob())
   const link = document.createElement('a')
