@@ -107,9 +107,6 @@ class RunService {
         if (active >= policy.maxConcurrentRuns()) {
             throw new DomainException("TOO_MANY_ACTIVE_RUNS", HttpStatus.TOO_MANY_REQUESTS, "This project already has " + active + " run(s) executing; wait for one to reach a stopping point");
         }
-        if (!agent.simulated() && cmd.mode() != RunMode.INVESTIGATE_ONLY) {
-            throw DomainException.unprocessable("MODE_NOT_AVAILABLE_FOR_PROVIDER", "With a real model only 'Investigate only' is available for now; fix proposals and patches arrive in a later milestone");
-        }
         // Pin each repository to the commit it has right now; every later read and every citation is against that commit.
         Map<UUID, String> pinned = new LinkedHashMap<>();
         for (UUID id : repoIds) pinned.put(id, repositories.refresh(id).headSha());
@@ -219,7 +216,7 @@ class RunService {
                 else if (owner) a.add("resume");
             }
             case FINDINGS_AVAILABLE -> {
-                if (owner && r.simulated()) a.add("request-fix"); // fixes with a real model arrive in a later milestone
+                if (owner) a.add("request-fix");
                 a.add("complete");
             }
             case FIX_PROPOSAL_AVAILABLE -> {

@@ -33,6 +33,11 @@ class ArchitectureRulesTest {
         .should().dependOnClassesThat().resideInAnyPackage("ai.devforge.integration.internal.mcp..").because("the rest of the platform sees tickets, never the protocol");
 
     @ArchTest
+    static final ArchRule repositoryCodeRunsOnlyThroughTheValidator = noClasses().that().resideOutsideOfPackage("ai.devforge.execution..")
+        .should().dependOnClassesThat().haveFullyQualifiedName("ai.devforge.execution.Sandbox").orShould().dependOnClassesThat().haveFullyQualifiedName("ai.devforge.execution.SandboxSpec")
+        .because("untrusted code is only ever run by the validator, inside the sandbox");
+
+    @ArchTest
     static final ArchRule coreNeverDependsOnAnAdapter = noClasses().that().resideOutsideOfPackages("ai.devforge.agent.internal.anthropic..")
         .should().dependOnClassesThat().resideInAnyPackage("ai.devforge.agent.internal.anthropic..").because("adapters are discovered, never referenced");
 

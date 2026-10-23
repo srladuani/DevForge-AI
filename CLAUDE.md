@@ -5,7 +5,7 @@ DevForge AI is a **generic AI software-engineering platform** for any team with 
 
 It is a product, not an internal tool. No company, customer, repo name, tracker, Git host, or LLM vendor may be baked into core code or prompts; they come from configuration behind ports/adapters. ProgressiveBeef is the first test project only.
 
-**Status:** M1 (prototype), M2 (real investigation) and M3 (Jira via MCP) are built. `devforge.agent.mode` is `simulated` by default (labelled simulation: no model, nothing executed) or `real` (Claude via each user's own key; **investigate-only**; verified against a scripted provider, not yet the live API — see ADR-0014). M3 reads Jira tickets through MCP with each user's own connection (verified against a fake MCP server, not against Atlassian). Sandboxed validation, clone-by-URL and PRs are not built. See `docs/engineering/implementation-plan.md` (milestone status + limitations). Do not build beyond the milestone currently approved there.
+**Status:** M1 (prototype), M2 (real investigation) and M3 (Jira via MCP) are built; M4 is under way. `devforge.agent.mode` is `simulated` by default (labelled simulation: no model, nothing executed) or `real` (Claude via each user's own key; investigation, fix proposal, edits and validation; verified against a scripted provider, not yet the live API — see ADR-0014). M3 reads Jira tickets through MCP with each user's own connection (verified against a fake MCP server, not against Atlassian). M4 (in progress): real fix proposals, scoped edits in private copies, patches and sandboxed (bubblewrap) validation exist, verified against a scripted model and stub runner, not the live API or real Gradle/Maven builds. Clone-by-URL, branches/PRs and the Docker sandbox backend are not built. See `docs/engineering/implementation-plan.md` (milestone status + limitations). Do not build beyond the milestone currently approved there.
 
 ## Product model
 1. **Project** (code: `Workspace` with `kind`; UI label "Project"). On creation the user picks a **project type**:
@@ -45,7 +45,7 @@ spikes/     throwaway M0 experiment code (not product code)
 scripts/    verify.sh = the quality gate
 .claude/skills/   project skills
 ```
-Backend modules (built): `platform` (shared), `identity`, `audit`, `repository`, `workspace`, `integration`, `agent`, `approval`, `workflow`; `execution` (sandbox) comes in M4. **A module's root package is its public API; `internal` is private** — other modules may use only the root package or domain events (enforced by `ModularityTest`).
+Backend modules (built): `platform` (shared), `identity`, `audit`, `repository`, `workspace`, `integration`, `agent`, `approval`, `workflow`; `execution` (sandbox, private work copies, validator). **A module's root package is its public API; `internal` is private** — other modules may use only the root package or domain events (enforced by `ModularityTest`).
 
 ## Commands
 `docker compose up -d postgres` · backend `cd backend && ./mvnw verify` / `./mvnw spring-boot:run -Dspring-boot.run.profiles=local` (port **8787**, needs `DEVFORGE_MASTER_KEY`) · frontend `cd frontend && npm run dev | lint | typecheck | test | build | gen:api | e2e` · everything: `scripts/verify.sh [--e2e]`. After editing the API: update the snapshot (`-Dopenapi.update=true`), review the diff, then `npm run gen:api`. After mutating sources for a test, run `./mvnw clean` (stale classes hide the restore).

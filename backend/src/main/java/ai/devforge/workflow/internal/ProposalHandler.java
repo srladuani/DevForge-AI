@@ -26,6 +26,11 @@ class ProposalHandler implements StepHandler {
         this.approvals = approvals;
     }
 
+    private void recordSimulatedUsage(RunRow run) {
+        data.addModelCall(run.id(), "PROPOSING_FIX", run.ownerUserId(), run.agentProvider(), run.agentModel(), 400, 250, null, true);
+        store.addUsage(run.id(), 400, 250, null);
+    }
+
     @Override public RunStatus step() { return RunStatus.PROPOSING_FIX; }
 
     @Override
@@ -35,8 +40,7 @@ class ProposalHandler implements StepHandler {
         approvals.supersedePending(run.id(), "a new fix proposal replaced the one under review");
         var art = data.addArtifact(run.id(), "FIX_PROPOSAL", proposal);
         store.appendEvent(run.id(), "ARTIFACT_CREATED", Map.of("type", "FIX_PROPOSAL", "hash", art.hash(), "files", proposal.filesToChange().size()));
-        data.addModelCall(run.id(), "PROPOSING_FIX", run.ownerUserId(), run.agentProvider(), run.agentModel(), 400, 250, null, run.simulated());
-        store.addUsage(run.id(), 400, 250, null);
+        if (run.simulated()) recordSimulatedUsage(run);
         return Outcome.next(RunStatus.FIX_PROPOSAL_AVAILABLE, "proposal ready (" + proposal.filesToChange().size() + " file(s))");
     }
 }

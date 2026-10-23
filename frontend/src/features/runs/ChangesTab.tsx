@@ -75,7 +75,7 @@ function ChangeCard({ change, validations }: { change: Change; validations: Vali
                     <Badge tone={s.tone}>{s.label}</Badge>
                     {v.command && <code className="font-mono text-xs">{v.command}</code>}
                   </div>
-                  <p className="mt-1 text-xs text-muted">{v.summary}</p>
+                  <ValidationSummary text={v.summary} />
                 </li>
               )
             })}
@@ -83,5 +83,25 @@ function ChangeCard({ change, validations }: { change: Change; validations: Vali
         </div>
       </div>
     </Card>
+  )
+}
+
+const OUTPUT_MARK = '\n--- output (end) ---\n'
+
+/** The one-line result first; what the build printed is untrusted program output and stays collapsed. */
+function ValidationSummary({ text }: { text: string }) {
+  const at = text.indexOf(OUTPUT_MARK)
+  const head = at < 0 ? text : text.slice(0, at)
+  const output = at < 0 ? '' : text.slice(at + OUTPUT_MARK.length)
+  return (
+    <>
+      <p className="mt-1 text-xs text-muted">{head}</p>
+      {output !== '' && (
+        <details className="mt-1 text-xs">
+          <summary className="cursor-pointer underline">Show the end of the output</summary>
+          <pre className="mt-1 max-h-64 overflow-auto whitespace-pre-wrap rounded bg-surface p-2 font-mono">{output}</pre>
+        </details>
+      )}
+    </>
   )
 }

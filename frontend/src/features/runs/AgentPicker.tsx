@@ -11,11 +11,6 @@ export interface AgentChoice {
   fastModel: string
 }
 
-/** With a real model only investigation is available for now; the simulation supports every mode. */
-export function supportsFixModes(providers: ProviderOption[], provider: string): boolean {
-  return providers.find((p) => p.provider === provider)?.availability !== 'REAL'
-}
-
 function modelLabel(m: ModelInfo): string {
   const bits = [m.displayName, titleCase(m.tier)]
   if (!m.available) bits.push(m.unavailableReason ?? 'unavailable')

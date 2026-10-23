@@ -38,6 +38,11 @@ devforge:
     step-timeout: PT8M
     request-timeout: PT120S  # one model call
     max-tool-output-chars: 12000
+  execution:
+    # Where private working copies live (never inside a user's checkout). Default: <java.io.tmpdir>/devforge-work
+    work-root: ${DEVFORGE_WORK_ROOT:}
+    # JDK/Node/build-tool installs the sandbox may see read-only, e.g. a version manager's install directories. Their bin/ is added to PATH.
+    # toolchain-mounts: [/opt/node-22, /opt/jdk-21]
   security:
     # Vault master keys by version (base64, 32 bytes). Rotate by adding a new version and raising current-key-version.
     current-key-version: 1

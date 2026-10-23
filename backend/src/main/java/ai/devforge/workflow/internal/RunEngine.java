@@ -121,7 +121,7 @@ class RunEngine {
                     default -> { return Outcome.fail("MODEL_" + e.kind(), step, e.getMessage(), false); }
                 }
             } catch (DomainException e) {
-                boolean environmental = e.code().startsWith("REPOSITORY_") || e.code().startsWith("GIT_");
+                boolean environmental = e.code().startsWith("REPOSITORY_") || e.code().startsWith("GIT_") || e.code().startsWith("AGENT_");
                 return Outcome.fail(e.code(), step, e.getMessage(), environmental);
             } catch (RuntimeException e) {
                 log.error("Step {} failed unexpectedly", step, e);

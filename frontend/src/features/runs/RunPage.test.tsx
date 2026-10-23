@@ -193,4 +193,28 @@ describe('Run page', () => {
     await screen.findByTitle(/backed by code the server re-read/i)
     expect(await axe(container)).toHaveNoViolations()
   })
+
+  it('shows a real check result as counts and failing tests, keeps build output collapsed, and never presents NOT_RUN as a pass', async () => {
+    const r = setup({ run: run({ status: 'AWAITING_REVIEW', mode: 'FIX_AND_PATCH', agent: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', simulated: false }, nextActions: ['accept', 'request-changes', 'cancel'] }) })
+    const change = { id: 'c1', repositoryId: ids.backend, repoName: 'api', baseSha: 'a'.repeat(40), patch: '--- a/X.java\n+++ b/X.java\n@@ -1 +1 @@\n-old\n+new\n', patchHash: 'sha256:1', files: ['X.java'], simulated: false, attempt: 1 }
+    server.use(
+      http.get(`/api/v1/runs/${r.id}/changes`, () => HttpResponse.json([change])),
+      http.get(`/api/v1/runs/${r.id}/validations`, () =>
+        HttpResponse.json([
+          { id: 'v1', codeChangeId: 'c1', repoName: 'api', command: './gradlew test --offline', status: 'FAILED', attempt: 1, summary: '3 test(s): 1 failed, 0 skipped. Failing: A.bad\n--- output (end) ---\nAssertionError: expected 1' },
+          { id: 'v2', codeChangeId: 'c1', repoName: 'api', status: 'NOT_RUN', attempt: 2, summary: 'No sandbox is available on this server, so no repository code was run' },
+        ]),
+      ),
+    )
+    const user = userEvent.setup()
+    renderApp(`/runs/${ids.run}?tab=changes`)
+    expect(await screen.findByText(/3 test\(s\): 1 failed/)).toBeInTheDocument()
+    expect(screen.getByText('Failed')).toBeInTheDocument()
+    expect(screen.getByText('Not run')).toBeInTheDocument()
+    expect(screen.queryByText('Passed')).not.toBeInTheDocument()
+    const details = screen.getByText('Show the end of the output').closest('details')
+    expect(details).not.toHaveAttribute('open')
+    await user.click(screen.getByText('Show the end of the output'))
+    expect(screen.getByText(/AssertionError: expected 1/)).toBeVisible()
+  })
 })

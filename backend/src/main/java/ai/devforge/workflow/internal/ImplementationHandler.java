@@ -31,6 +31,16 @@ class ImplementationHandler implements StepHandler {
         this.approvals = approvals;
     }
 
+    /** Reviewer feedback, plus (after a failed validation) what failed, so the next attempt can fix the cause instead of guessing. */
+    private String feedbackFor(RunRow run, int attempt) {
+        String feedback = data.latestReviewFeedback(run.id());
+        if (attempt <= 1) return feedback;
+        String failure = data.validations(run.id()).stream().filter(v -> v.attempt() == attempt - 1 && v.status().equals("FAILED"))
+            .map(v -> v.repoName() + ": " + v.summary()).collect(java.util.stream.Collectors.joining("\n\n"));
+        if (failure.isBlank()) return feedback;
+        return (feedback == null ? "" : feedback) + "\n\u0000validation-failure\n" + failure;
+    }
+
     @Override public RunStatus step() { return RunStatus.IMPLEMENTATION; }
 
     @Override
@@ -42,7 +52,7 @@ class ImplementationHandler implements StepHandler {
         FixProposalDraft proposal = store.json.readValue(artifact.get().content(), FixProposalDraft.class);
         int attempt = store.countSucceededSteps(run.id(), "IMPLEMENTATION") + 1;
         data.deleteChangesOfAttempt(run.id(), attempt);
-        List<ChangeDraft> changes = agent.implement(contexts.build(run, ctx), proposal, data.latestReviewFeedback(run.id()));
+        List<ChangeDraft> changes = agent.implement(contexts.build(run, ctx), proposal, feedbackFor(run, attempt));
         Map<java.util.UUID, RepoView> scope = new java.util.HashMap<>();
         data.repos(run.id()).forEach(r -> scope.put(r.repositoryId(), r));
         for (ChangeDraft c : changes) {
@@ -51,8 +61,10 @@ class ImplementationHandler implements StepHandler {
             data.addChange(run.id(), c.repositoryId(), repo.name(), repo.baseSha(), c.patch(), c.files(), c.simulated(), attempt);
             store.appendEvent(run.id(), "CHANGE_PREPARED", Map.of("repository", repo.name(), "files", c.files(), "attempt", attempt, "simulated", c.simulated()));
         }
-        data.addModelCall(run.id(), "IMPLEMENTATION", run.ownerUserId(), run.agentProvider(), run.agentModel(), 600, 400, null, run.simulated());
-        store.addUsage(run.id(), 600, 400, null);
+        if (run.simulated()) {
+            data.addModelCall(run.id(), "IMPLEMENTATION", run.ownerUserId(), run.agentProvider(), run.agentModel(), 600, 400, null, true);
+            store.addUsage(run.id(), 600, 400, null);
+        }
         return Outcome.next(RunStatus.VALIDATION, changes.size() + " change set(s), attempt " + attempt);
     }
 }

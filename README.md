@@ -11,7 +11,8 @@ See [`CLAUDE.md`](CLAUDE.md) for the product model and engineering rules, and [`
 | M1 Functional prototype | Built: full run lifecycle on real repos with a **labelled simulation** of the AI step |
 | M2 Real investigation | Built: Claude (each user's own key), read-only repo tools, evidence verification. Verified against a scripted provider, **not yet the live API** |
 | M3 Jira via MCP | Built: tickets read with each user's own connection. Verified against a fake MCP server, **not yet Atlassian** |
-| M2b OpenAI / Gemini, M4 fix + sandbox, M5 branch/PR, M6 hardening | Not started |
+| M4 Fix proposal, approved implementation, sandboxed validation | In progress: real proposal/edit/validate pipeline built and tested against a scripted model and a stub test runner; **not yet** live API or real Gradle/Maven builds |
+| M2b OpenAI / Gemini, M5 branch/PR, M6 hardening | Not started |
 
 Details and known gaps: [`docs/engineering/implementation-plan.md`](docs/engineering/implementation-plan.md).
 
@@ -47,7 +48,7 @@ cd ../frontend && npm ci && npm run dev
 ## Trying the real pieces
 
 - **Simulated (default):** add any 8+ character value as a Claude key under *My connections*, create a project with one or more local repository paths, start a run.
-- **Real Claude:** set `DEVFORGE_AGENT_MODE=real` in `.env.local`, restart, add your own Anthropic API key, press *Verify*, start an *Investigate only* run.
+- **Real Claude:** set `DEVFORGE_AGENT_MODE=real` in `.env.local`, restart, add your own Anthropic API key, press *Verify*, start a run. *Investigate only* is read-only; the fix modes make edits in a private copy and run tests in a bubblewrap sandbox (needs `bwrap`; list your JDK/Node install directories in `devforge.execution.toolchain-mounts`).
 - **Jira tickets:** add a *Jira (via MCP)* connection (`email:api-token` or a bearer token) and press *Verify*; then set the project's tracker under *People & policy* and start a run from a ticket key. Paste-the-text mode always works without it.
 
 ## Check everything

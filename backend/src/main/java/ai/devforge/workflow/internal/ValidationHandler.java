@@ -32,8 +32,12 @@ class ValidationHandler implements StepHandler {
     public Outcome handle(RunRow run, StepContext ctx) {
         int attempt = data.latestChangeAttempt(run.id());
         var stored = data.changesOfAttempt(run.id(), attempt);
+        var views = data.changes(run.id()).stream().filter(c -> c.attempt() == attempt).toList();
         List<ChangeDraft> drafts = new ArrayList<>();
-        for (var c : stored) drafts.add(new ChangeDraft(c.repositoryId(), c.repoName(), "", List.of(), true));
+        for (var c : stored) {
+            var v = views.stream().filter(x -> x.id().equals(c.id())).findFirst().orElseThrow();
+            drafts.add(new ChangeDraft(c.repositoryId(), c.repoName(), v.patch(), v.files(), v.simulated()));
+        }
         data.deleteValidationsOfAttempt(run.id(), attempt);
         List<ValidationDraft> results = agent.validate(contexts.build(run, ctx), drafts);
         boolean failed = false;

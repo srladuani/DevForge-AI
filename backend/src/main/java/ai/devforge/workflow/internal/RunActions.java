@@ -100,7 +100,6 @@ class RunActions {
     RunView requestFix(UUID runId, CurrentUser user, RunMode mode) {
         RunRow run = ownerAction(runId, user);
         if (run.status() != RunStatus.FINDINGS_AVAILABLE) throw badState(run, "request-fix");
-        if (!run.simulated()) throw DomainException.unprocessable("MODE_NOT_AVAILABLE_FOR_PROVIDER", "Fix proposals with a real model arrive in a later milestone");
         if (mode != RunMode.PROPOSE_FIX && mode != RunMode.FIX_AND_PATCH) throw DomainException.badRequest("INVALID_MODE", "mode must be PROPOSE_FIX or FIX_AND_PATCH");
         tx.executeWithoutResult(s -> {
             store.setMode(runId, mode);

@@ -160,11 +160,11 @@ describe('New run', () => {
     expect(screen.getByText('Real model')).toBeInTheDocument()
     expect(screen.queryByText(/the provider adapter is simulated/i)).not.toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /investigate only/i })).toBeChecked()
-    expect(screen.getByRole('radio', { name: /investigate and propose a fix/i })).toBeDisabled()
-    expect(screen.getByRole('radio', { name: /investigate, fix and prepare a patch/i })).toBeDisabled()
-    expect(screen.getAllByText('Not available with a real model yet.')).toHaveLength(2)
+    expect(screen.getByRole('radio', { name: /investigate and propose a fix/i })).toBeEnabled()
+    await user.click(screen.getByRole('radio', { name: /investigate, fix and prepare a patch/i }))
+    expect(screen.getByText(/private copy of each repository/i)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Start run' }))
-    await waitFor(() => expect((body as { mode: string }).mode).toBe('INVESTIGATE_ONLY'))
+    await waitFor(() => expect((body as { mode: string }).mode).toBe('FIX_AND_PATCH'))
   })
 
   it('does not let a viewer start runs', async () => {

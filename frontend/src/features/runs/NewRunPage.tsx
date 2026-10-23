@@ -8,7 +8,7 @@ import { Input, Textarea } from '../../components/ui/Field'
 import { ApiError, errorMessage } from '../../lib/api/client'
 import { useAgentProviders } from '../connections/api'
 import { roleLabel, useProject, useRepos, useTracker } from '../projects/api'
-import { AgentPicker, supportsFixModes, type AgentChoice } from './AgentPicker'
+import { AgentPicker, type AgentChoice } from './AgentPicker'
 import { useCreateRun, usePreviewTicket, type RunMode, type TicketPreview } from './api'
 
 const MODES: Array<{ value: RunMode; title: string; help: string }> = [
@@ -44,8 +44,6 @@ export function NewRunPage() {
 
   const selected = chosen ?? new Set(repos.data.map((r) => r.repositoryId))
   const keyOk = kind === 'PROMPT' || /^[A-Z][A-Z0-9]{1,9}-\d{1,9}$/.test(ticketKey.trim())
-  const fixAllowed = supportsFixModes(providers.data ?? [], agent.provider)
-  const effectiveMode: RunMode = fixAllowed ? mode : 'INVESTIGATE_ONLY'
   // With a tracker set, the ticket is read for the run from the tracker; otherwise (or by choice) the person pastes it.
   const fromTracker = kind === 'TICKET' && tracker.data?.configured === true && !pasteInstead
   const ready = selected.size > 0 && (fromTracker ? ticketKey.trim() !== '' : text.trim() !== '') && keyOk && agent.provider !== '' && agent.model !== ''
@@ -64,7 +62,7 @@ export function NewRunPage() {
       {
         idempotencyKey,
         body: {
-          mode: effectiveMode,
+          mode,
           input: { kind, ...(fromTracker ? {} : { text: text.trim() }), ...(kind === 'TICKET' ? { ref: ticketKey.trim() } : {}) },
           repositoryIds: [...selected],
           agent: { provider: agent.provider, model: agent.model, ...(agent.fastModel ? { fastModel: agent.fastModel } : {}) },
@@ -139,14 +137,14 @@ export function NewRunPage() {
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">How far should it go?</legend>
+        <p className="text-xs text-muted">Changes are made in a private copy of each repository and tests run in an isolated sandbox with no network. Your checkouts are never touched, and nothing is applied without your approval.</p>
         {MODES.map((m) => {
-          const blocked = !fixAllowed && m.value !== 'INVESTIGATE_ONLY'
           return (
-            <label key={m.value} className={`flex items-start gap-3 rounded-md border p-3 text-sm ${blocked ? 'cursor-not-allowed border-dashed border-border bg-surface-2 opacity-70' : 'border-border bg-surface has-checked:border-accent has-checked:ring-1 has-checked:ring-accent'}`}>
-              <input type="radio" name="mode" className="mt-1" checked={effectiveMode === m.value} disabled={blocked} onChange={() => setMode(m.value)} />
+            <label key={m.value} className={`flex items-start gap-3 rounded-md border p-3 text-sm border-border bg-surface has-checked:border-accent has-checked:ring-1 has-checked:ring-accent`}>
+              <input type="radio" name="mode" className="mt-1" checked={mode === m.value} onChange={() => setMode(m.value)} />
               <span>
                 <span className="block font-medium">{m.title}</span>
-                <span className="block text-muted">{blocked ? 'Not available with a real model yet.' : m.help}</span>
+                <span className="block text-muted">{m.help}</span>
               </span>
             </label>
           )

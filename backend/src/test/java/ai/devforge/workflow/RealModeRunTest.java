@@ -84,18 +84,6 @@ class RealModeRunTest extends WorkflowTestBase {
     }
 
     @Test
-    void onlyInvestigationIsAvailableWithARealModelForNow() throws Exception {
-        rawCreate(u("owner"), body("PROPOSE_FIX", TICKET_TEXT)).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("MODE_NOT_AVAILABLE_FOR_PROVIDER"));
-        rawCreate(u("owner"), body("FIX_AND_PATCH", TICKET_TEXT)).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("MODE_NOT_AVAILABLE_FOR_PROVIDER"));
-        server.then(toolUse("s", "submit_findings", submit(""), 10, 5));
-        String run = investigate(TICKET_TEXT);
-        awaitStatus(run, "FINDINGS_AVAILABLE");
-        api.get(u("owner"), "/api/v1/runs/" + run).andExpect(jsonPath("$.nextActions").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("request-fix"))));
-        act(u("owner"), run, "request-fix", "{\"mode\":\"PROPOSE_FIX\"}").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("MODE_NOT_AVAILABLE_FOR_PROVIDER"));
-        assertThat(statusOf(run)).isEqualTo("FINDINGS_AVAILABLE");
-    }
-
-    @Test
     void aRejectedKeyPausesTheRunWithoutRetryingAndTheReplacementKeyIsUsedOnResume() throws Exception {
         server.then(failure(401, "authentication_error", "invalid x-api-key"));
         String run = investigate(TICKET_TEXT);
