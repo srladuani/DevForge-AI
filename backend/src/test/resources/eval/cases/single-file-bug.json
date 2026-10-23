@@ -1,0 +1,91 @@
+{
+ "id": "single-file-bug",
+ "description": "A discount parameter is accepted but never applied. One file, direct keyword match.",
+ "synthetic": true,
+ "ticket": "Invoice totals ignore the discount for customers who used a promo code. Expected: total = subtotal + tax - discount.",
+ "repos": [
+  {
+   "name": "api",
+   "role": "BACKEND",
+   "files": {
+    "src/main/java/com/acme/invoice/InvoiceService.java": "package com.acme.invoice;\n\npublic class InvoiceService {\n    public double total(double subtotal, double tax, double discount) {\n        // discount is accepted but never applied\n        return subtotal + tax;\n    }\n}\n",
+    "src/main/java/com/acme/user/UserService.java": "package com.acme.user;\npublic class UserService { }\n"
+   }
+  }
+ ],
+ "transcript": [
+  {
+   "calls": [
+    {
+     "name": "repo_search_files",
+     "args": {
+      "repo": "api",
+      "keywords": [
+       "invoice",
+       "discount",
+       "total"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "repo_read",
+     "args": {
+      "repo": "api",
+      "path": "src/main/java/com/acme/invoice/InvoiceService.java",
+      "start_line": 1,
+      "end_line": 8
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "submit_findings",
+     "args": {
+      "summary": "InvoiceService.total accepts a discount but returns subtotal + tax.",
+      "findings": [
+       {
+        "label": "VERIFIED",
+        "text": "total() never subtracts the discount parameter",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/invoice/InvoiceService.java",
+          "startLine": 4,
+          "endLine": 6
+         }
+        ]
+       }
+      ],
+      "hypotheses": [
+       {
+        "text": "Callers may already pre-subtract the discount",
+        "confidence": "LOW",
+        "supporting": [],
+        "contradicting": []
+       }
+      ],
+      "unknowns": [
+       "No call sites were examined"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "expect": {
+  "rootFiles": [
+   "api:src/main/java/com/acme/invoice/InvoiceService.java"
+  ],
+  "citeRepos": [
+   "api"
+  ],
+  "minVerified": 1
+ }
+}

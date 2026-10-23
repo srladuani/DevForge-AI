@@ -1,0 +1,20 @@
+# Local development database. The application itself runs on the host (see docs/engineering/development-setup.md).
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DEVFORGE_DB_NAME:-devforge}
+      POSTGRES_USER: ${DEVFORGE_DB_USER:-devforge}
+      POSTGRES_PASSWORD: ${DEVFORGE_DB_PASSWORD:-devforge}
+    ports:
+      - "127.0.0.1:${DEVFORGE_DB_PORT:-5432}:5432"
+    volumes:
+      - devforge-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  devforge-pg:

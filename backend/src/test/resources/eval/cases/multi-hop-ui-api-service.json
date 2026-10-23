@@ -1,0 +1,180 @@
+{
+ "id": "multi-hop-ui-api-service",
+ "description": "Export button in the web app calls an API whose service loads every row into memory. Spans two repositories and three files.",
+ "synthetic": true,
+ "ticket": "Exporting orders from the admin portal times out when there are more than 1000 orders.",
+ "repos": [
+  {
+   "name": "admin-portal",
+   "role": "WEB_FRONTEND",
+   "files": {
+    "src/api/orders.js": "export const exportOrders = () => fetch('/api/v1/orders/export')\n",
+    "src/components/ExportButton.jsx": "import { exportOrders } from '../api/orders'\nexport default () => <button onClick={exportOrders}>Export</button>\n"
+   }
+  },
+  {
+   "name": "api",
+   "role": "BACKEND",
+   "files": {
+    "src/main/java/com/acme/order/OrderController.java": "package com.acme.order;\n\n@RestController\npublic class OrderController {\n    @GetMapping(\"/api/v1/orders/export\")\n    public byte[] export() {\n        return exportService.buildCsv();\n    }\n}\n",
+    "src/main/java/com/acme/order/OrderExportService.java": "package com.acme.order;\n\npublic class OrderExportService {\n    public byte[] buildCsv() {\n        // loads every order into memory before writing\n        List<Order> all = repository.findAll();\n        return toCsv(all);\n    }\n}\n"
+   }
+  }
+ ],
+ "transcript": [
+  {
+   "calls": [
+    {
+     "name": "repo_grep",
+     "args": {
+      "repo": "admin-portal",
+      "term": "orders"
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "repo_read",
+     "args": {
+      "repo": "admin-portal",
+      "path": "src/api/orders.js",
+      "start_line": 1,
+      "end_line": 1
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "repo_grep",
+     "args": {
+      "repo": "api",
+      "term": "orders/export"
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "repo_read",
+     "args": {
+      "repo": "api",
+      "path": "src/main/java/com/acme/order/OrderController.java",
+      "start_line": 1,
+      "end_line": 9
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "repo_read",
+     "args": {
+      "repo": "api",
+      "path": "src/main/java/com/acme/order/OrderExportService.java",
+      "start_line": 1,
+      "end_line": 9
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "submit_findings",
+     "args": {
+      "summary": "The export button calls /api/v1/orders/export, served by OrderController, which delegates to OrderExportService; that loads every order into memory.",
+      "findings": [
+       {
+        "label": "VERIFIED",
+        "text": "The web app calls GET /api/v1/orders/export",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "admin-portal",
+          "path": "src/api/orders.js",
+          "startLine": 1,
+          "endLine": 1
+         }
+        ]
+       },
+       {
+        "label": "VERIFIED",
+        "text": "The backend maps that URL to OrderController.export",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/order/OrderController.java",
+          "startLine": 5,
+          "endLine": 7
+         }
+        ]
+       },
+       {
+        "label": "VERIFIED",
+        "text": "buildCsv loads all orders with findAll() before writing",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/order/OrderExportService.java",
+          "startLine": 5,
+          "endLine": 6
+         }
+        ]
+       },
+       {
+        "label": "SUPPORTED",
+        "text": "Large exports therefore exhaust memory/time",
+        "confidence": "MEDIUM",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/order/OrderExportService.java",
+          "startLine": 5,
+          "endLine": 7
+         },
+         {
+          "repo": "admin-portal",
+          "path": "src/api/orders.js",
+          "startLine": 1,
+          "endLine": 1
+         }
+        ]
+       }
+      ],
+      "hypotheses": [
+       {
+        "text": "Row count at failure is unknown",
+        "confidence": "LOW",
+        "supporting": [],
+        "contradicting": []
+       }
+      ],
+      "unknowns": [
+       "No production data or logs were available"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "expect": {
+  "rootFiles": [
+   "api:src/main/java/com/acme/order/OrderExportService.java",
+   "api:src/main/java/com/acme/order/OrderController.java",
+   "admin-portal:src/api/orders.js"
+  ],
+  "citeRepos": [
+   "api",
+   "admin-portal"
+  ],
+  "minVerified": 3
+ }
+}

@@ -1,0 +1,8 @@
+# Local development only: header-based dev login (X-Devforge-User). Never enable outside a developer machine.
+# Header-trust sign-in must never be reachable from the network: listen on loopback only.
+server:
+  address: 127.0.0.1
+
+devforge:
+  security:
+    dev-auth-enabled: true

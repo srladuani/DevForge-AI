@@ -1,0 +1,2625 @@
+{
+  "components" : {
+    "schemas" : {
+      "ActionBody" : {
+        "properties" : {
+          "mode" : {
+            "enum" : [ "INVESTIGATE_ONLY", "PROPOSE_FIX", "FIX_AND_PATCH" ],
+            "type" : "string"
+          },
+          "text" : {
+            "maxLength" : 20000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AdapterType" : {
+        "properties" : {
+          "authMethods" : {
+            "items" : {
+              "enum" : [ "API_KEY", "PAT", "OAUTH" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "availability" : {
+            "enum" : [ "REAL", "SIMULATED", "PLANNED" ],
+            "type" : "string"
+          },
+          "defaultBaseUrl" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "AI_PROVIDER", "GIT_HOST", "TRACKER" ],
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "authMethods", "availability", "displayName", "kind", "type" ],
+        "type" : "object"
+      },
+      "AddRepositoryRequest" : {
+        "properties" : {
+          "cloneUrl" : {
+            "type" : "string"
+          },
+          "hints" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "path" : {
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [ "BACKEND", "WEB_FRONTEND", "MOBILE", "LIBRARY", "OTHER" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "role" ],
+        "type" : "object"
+      },
+      "AgentSelectionRequest" : {
+        "properties" : {
+          "fastModel" : {
+            "maxLength" : 120,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "model" : {
+            "maxLength" : 120,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "provider" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "model", "provider" ],
+        "type" : "object"
+      },
+      "AgentView" : {
+        "properties" : {
+          "fastModel" : {
+            "type" : "string"
+          },
+          "model" : {
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "simulated" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "model", "provider", "simulated" ],
+        "type" : "object"
+      },
+      "ApprovalView" : {
+        "properties" : {
+          "artifactHash" : {
+            "type" : "string"
+          },
+          "comment" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decidedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "IMPLEMENT", "PUSH", "PR", "TRACKER_WRITE" ],
+            "type" : "string"
+          },
+          "requestedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "runId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING", "APPROVED", "REJECTED", "SUPERSEDED", "EXPIRED" ],
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          },
+          "workspaceId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "artifactHash", "createdAt", "expiresAt", "id", "kind", "requestedBy", "runId", "status", "summary", "workspaceId" ],
+        "type" : "object"
+      },
+      "ArtifactView" : {
+        "properties" : {
+          "content" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "contentHash" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "current" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "content", "contentHash", "createdAt", "current", "id", "type" ],
+        "type" : "object"
+      },
+      "AuditEventView" : {
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "actor" : {
+            "type" : "string"
+          },
+          "details" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "targetId" : {
+            "type" : "string"
+          },
+          "targetType" : {
+            "type" : "string"
+          },
+          "ts" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "action", "actor", "id", "ts" ],
+        "type" : "object"
+      },
+      "BuildTool" : {
+        "properties" : {
+          "buildCommand" : {
+            "type" : "string"
+          },
+          "frameworks" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "root" : {
+            "type" : "string"
+          },
+          "testCommand" : {
+            "type" : "string"
+          },
+          "tool" : {
+            "type" : "string"
+          },
+          "toolchain" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "frameworks", "root", "tool", "toolchain" ],
+        "type" : "object"
+      },
+      "ChangeView" : {
+        "properties" : {
+          "attempt" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "baseSha" : {
+            "type" : "string"
+          },
+          "files" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "patch" : {
+            "type" : "string"
+          },
+          "patchHash" : {
+            "type" : "string"
+          },
+          "repoName" : {
+            "type" : "string"
+          },
+          "repositoryId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "simulated" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "attempt", "baseSha", "files", "id", "patch", "patchHash", "repoName", "repositoryId", "simulated" ],
+        "type" : "object"
+      },
+      "ConnectionView" : {
+        "properties" : {
+          "authMethod" : {
+            "enum" : [ "API_KEY", "PAT", "OAUTH" ],
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "AI_PROVIDER", "GIT_HOST", "TRACKER" ],
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "lastVerifiedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "providerType" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "UNVERIFIED", "VALID", "INVALID", "QUOTA" ],
+            "type" : "string"
+          },
+          "statusMessage" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "authMethod", "createdAt", "id", "kind", "label", "providerType", "status", "userId" ],
+        "type" : "object"
+      },
+      "CreateConnectionRequest" : {
+        "properties" : {
+          "authMethod" : {
+            "enum" : [ "API_KEY", "PAT", "OAUTH" ],
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "AI_PROVIDER", "GIT_HOST", "TRACKER" ],
+            "type" : "string"
+          },
+          "label" : {
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "providerType" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "secret" : {
+            "maxLength" : 4096,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "authMethod", "kind", "label", "providerType", "secret" ],
+        "type" : "object"
+      },
+      "CreateProviderRequest" : {
+        "properties" : {
+          "adapterType" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "baseUrl" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "displayName" : {
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "kind" : {
+            "enum" : [ "AI_PROVIDER", "GIT_HOST", "TRACKER" ],
+            "type" : "string"
+          },
+          "modelPolicy" : {
+            "$ref" : "#/components/schemas/ModelPolicy"
+          }
+        },
+        "required" : [ "adapterType", "displayName", "kind" ],
+        "type" : "object"
+      },
+      "CreateRunRequest" : {
+        "properties" : {
+          "agent" : {
+            "$ref" : "#/components/schemas/AgentSelectionRequest"
+          },
+          "input" : {
+            "$ref" : "#/components/schemas/InputBody"
+          },
+          "mode" : {
+            "enum" : [ "INVESTIGATE_ONLY", "PROPOSE_FIX", "FIX_AND_PATCH" ],
+            "type" : "string"
+          },
+          "notes" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "repositoryIds" : {
+            "items" : {
+              "format" : "uuid",
+              "type" : "string"
+            },
+            "maxItems" : 10,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "agent", "input", "mode", "repositoryIds" ],
+        "type" : "object"
+      },
+      "CreateWorkspaceRequest" : {
+        "properties" : {
+          "kind" : {
+            "enum" : [ "SUPPORT", "NEW_PROJECT" ],
+            "type" : "string"
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "policy" : {
+            "$ref" : "#/components/schemas/WorkspacePolicy"
+          }
+        },
+        "required" : [ "kind", "name" ],
+        "type" : "object"
+      },
+      "CustomModel" : {
+        "properties" : {
+          "contextWindow" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "tier" : {
+            "type" : "string"
+          },
+          "toolCalling" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "id", "tier", "toolCalling" ],
+        "type" : "object"
+      },
+      "DecisionRequest" : {
+        "properties" : {
+          "artifactHash" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "comment" : {
+            "maxLength" : 2000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "APPROVE", "REJECT" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "artifactHash", "decision" ],
+        "type" : "object"
+      },
+      "EventView" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "payload" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "seq" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "createdAt", "payload", "seq", "type" ],
+        "type" : "object"
+      },
+      "EvidenceView" : {
+        "properties" : {
+          "contentHash" : {
+            "type" : "string"
+          },
+          "endLine" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "excerpt" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "path" : {
+            "type" : "string"
+          },
+          "problem" : {
+            "type" : "string"
+          },
+          "repoName" : {
+            "type" : "string"
+          },
+          "repositoryId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "sha" : {
+            "type" : "string"
+          },
+          "startLine" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "verified" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "endLine", "id", "path", "repoName", "repositoryId", "sha", "startLine", "verified" ],
+        "type" : "object"
+      },
+      "FailureView" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "message" : {
+            "type" : "string"
+          },
+          "retryable" : {
+            "type" : "boolean"
+          },
+          "step" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "message", "retryable", "step" ],
+        "type" : "object"
+      },
+      "FindingView" : {
+        "properties" : {
+          "confidence" : {
+            "type" : "string"
+          },
+          "downgradeReason" : {
+            "type" : "string"
+          },
+          "evidence" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EvidenceView"
+            },
+            "type" : "array"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "requestedLabel" : {
+            "type" : "string"
+          },
+          "step" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "confidence", "evidence", "id", "label", "requestedLabel", "step", "text" ],
+        "type" : "object"
+      },
+      "InputBody" : {
+        "properties" : {
+          "kind" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "ref" : {
+            "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "text" : {
+            "maxLength" : 20000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "kind" ],
+        "type" : "object"
+      },
+      "InputView" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "normalized" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "sourceRef" : {
+            "type" : "string"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "createdAt", "id", "kind", "text" ],
+        "type" : "object"
+      },
+      "Member" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [ "VIEWER", "OPERATOR", "APPROVER", "ADMIN" ],
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "displayName", "email", "role", "userId" ],
+        "type" : "object"
+      },
+      "ModelInfo" : {
+        "properties" : {
+          "available" : {
+            "type" : "boolean"
+          },
+          "contextWindow" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "seeded" : {
+            "type" : "boolean"
+          },
+          "tier" : {
+            "enum" : [ "STRONG", "BALANCED", "FAST" ],
+            "type" : "string"
+          },
+          "toolCalling" : {
+            "type" : "boolean"
+          },
+          "unavailableReason" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "available", "displayName", "id", "seeded", "tier", "toolCalling" ],
+        "type" : "object"
+      },
+      "ModelPolicy" : {
+        "properties" : {
+          "allow" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "customModels" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CustomModel"
+            },
+            "type" : "array"
+          },
+          "deny" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "tierOverrides" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "required" : [ "allow", "customModels", "deny", "tierOverrides" ],
+        "type" : "object"
+      },
+      "ProjectTypeDefinition" : {
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "disabledReason" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "inputKinds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "kind" : {
+            "enum" : [ "SUPPORT", "NEW_PROJECT" ],
+            "type" : "string"
+          },
+          "workflowId" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "description", "displayName", "enabled", "inputKinds", "kind", "workflowId" ],
+        "type" : "object"
+      },
+      "ProviderInstanceView" : {
+        "properties" : {
+          "adapterType" : {
+            "type" : "string"
+          },
+          "availability" : {
+            "enum" : [ "REAL", "SIMULATED", "PLANNED" ],
+            "type" : "string"
+          },
+          "baseUrl" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "AI_PROVIDER", "GIT_HOST", "TRACKER" ],
+            "type" : "string"
+          },
+          "modelPolicy" : {
+            "$ref" : "#/components/schemas/ModelPolicy"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "adapterType", "availability", "displayName", "enabled", "id", "kind", "modelPolicy", "updatedAt" ],
+        "type" : "object"
+      },
+      "ProviderOption" : {
+        "properties" : {
+          "allowedByProject" : {
+            "type" : "boolean"
+          },
+          "availability" : {
+            "enum" : [ "REAL", "SIMULATED", "PLANNED" ],
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "hasUsableConnection" : {
+            "type" : "boolean"
+          },
+          "instanceId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "models" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ModelInfo"
+            },
+            "type" : "array"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "selectable" : {
+            "type" : "boolean"
+          },
+          "unavailableReason" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "allowedByProject", "availability", "displayName", "hasUsableConnection", "instanceId", "models", "provider", "selectable" ],
+        "type" : "object"
+      },
+      "RepoProfile" : {
+        "properties" : {
+          "buildTools" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BuildTool"
+            },
+            "type" : "array"
+          },
+          "fileCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "headSha" : {
+            "type" : "string"
+          },
+          "instructionFiles" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "languages" : {
+            "additionalProperties" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "notes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "buildTools", "fileCount", "headSha", "instructionFiles", "languages", "notes" ],
+        "type" : "object"
+      },
+      "RepoView" : {
+        "properties" : {
+          "baseSha" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "repositoryId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "role" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "baseSha", "name", "repositoryId", "role" ],
+        "type" : "object"
+      },
+      "RunView" : {
+        "properties" : {
+          "agent" : {
+            "$ref" : "#/components/schemas/AgentView"
+          },
+          "awaitReason" : {
+            "type" : "string"
+          },
+          "cancelRequested" : {
+            "type" : "boolean"
+          },
+          "costUsd" : {
+            "type" : "number"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "failure" : {
+            "$ref" : "#/components/schemas/FailureView"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "incomplete" : {
+            "type" : "boolean"
+          },
+          "inputTokens" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "inputs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/InputView"
+            },
+            "type" : "array"
+          },
+          "mode" : {
+            "enum" : [ "INVESTIGATE_ONLY", "PROPOSE_FIX", "FIX_AND_PATCH" ],
+            "type" : "string"
+          },
+          "nextActions" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "notes" : {
+            "type" : "string"
+          },
+          "outputTokens" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ownerUserId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "repositories" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RepoView"
+            },
+            "type" : "array"
+          },
+          "resumeState" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "CREATED", "INPUT_RETRIEVAL", "AWAITING_INPUT", "CONTEXT_GATHERING", "INVESTIGATION", "FINDINGS_AVAILABLE", "PROPOSING_FIX", "FIX_PROPOSAL_AVAILABLE", "AWAITING_APPROVAL", "IMPLEMENTATION", "VALIDATION", "AWAITING_REVIEW", "PR_PREPARATION", "COMPLETED", "FAILED", "CANCELLED" ],
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "workspaceId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "agent", "cancelRequested", "createdAt", "id", "incomplete", "inputTokens", "inputs", "mode", "nextActions", "outputTokens", "ownerUserId", "repositories", "status", "title", "type", "updatedAt", "workspaceId" ],
+        "type" : "object"
+      },
+      "SetMemberRequest" : {
+        "properties" : {
+          "email" : {
+            "maxLength" : 320,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [ "VIEWER", "OPERATOR", "APPROVER", "ADMIN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "email", "role" ],
+        "type" : "object"
+      },
+      "SetTrackerRequest" : {
+        "properties" : {
+          "providerType" : {
+            "minLength" : 1,
+            "pattern" : "[A-Z][A-Z0-9_]{1,39}",
+            "type" : "string"
+          },
+          "siteHint" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "providerType" ],
+        "type" : "object"
+      },
+      "SseEmitter" : {
+        "properties" : {
+          "timeout" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "StepView" : {
+        "properties" : {
+          "attempt" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "detail" : {
+            "type" : "string"
+          },
+          "finishedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "attempt", "id", "name", "startedAt", "status" ],
+        "type" : "object"
+      },
+      "Ticket" : {
+        "properties" : {
+          "comments" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TicketComment"
+            },
+            "type" : "array"
+          },
+          "components" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "labels" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "priority" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "tracker" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "comments", "components", "key", "labels", "title", "tracker" ],
+        "type" : "object"
+      },
+      "TicketComment" : {
+        "properties" : {
+          "author" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "created" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "routine" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "author", "body", "routine" ],
+        "type" : "object"
+      },
+      "TrackerView" : {
+        "properties" : {
+          "configured" : {
+            "type" : "boolean"
+          },
+          "providerType" : {
+            "type" : "string"
+          },
+          "siteHint" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "configured" ],
+        "type" : "object"
+      },
+      "UpdateConnectionRequest" : {
+        "properties" : {
+          "label" : {
+            "maxLength" : 80,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "secret" : {
+            "maxLength" : 4096,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateProviderRequest" : {
+        "properties" : {
+          "baseUrl" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "displayName" : {
+            "maxLength" : 80,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "modelPolicy" : {
+            "$ref" : "#/components/schemas/ModelPolicy"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateRepositoryRequest" : {
+        "properties" : {
+          "hints" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "role" : {
+            "enum" : [ "BACKEND", "WEB_FRONTEND", "MOBILE", "LIBRARY", "OTHER" ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateWorkspaceRequest" : {
+        "properties" : {
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "policy" : {
+            "$ref" : "#/components/schemas/WorkspacePolicy"
+          }
+        },
+        "type" : "object"
+      },
+      "ValidationView" : {
+        "properties" : {
+          "attempt" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "codeChangeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "command" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "repoName" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "summary" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "attempt", "codeChangeId", "id", "repoName", "status", "summary" ],
+        "type" : "object"
+      },
+      "WorkspacePolicy" : {
+        "properties" : {
+          "allowedProviders" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "maxConcurrentRuns" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "maxRunCostUsd" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "requireDifferentApprover" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "allowedProviders", "maxConcurrentRuns", "maxRunCostUsd", "requireDifferentApprover" ],
+        "type" : "object"
+      },
+      "WorkspaceRepoView" : {
+        "properties" : {
+          "defaultBranch" : {
+            "type" : "string"
+          },
+          "headSha" : {
+            "type" : "string"
+          },
+          "hints" : {
+            "additionalProperties" : { },
+            "type" : "object"
+          },
+          "localPath" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "profile" : {
+            "$ref" : "#/components/schemas/RepoProfile"
+          },
+          "repositoryId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [ "BACKEND", "WEB_FRONTEND", "MOBILE", "LIBRARY", "OTHER" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "hints", "localPath", "name", "repositoryId", "role" ],
+        "type" : "object"
+      },
+      "WorkspaceView" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "SUPPORT", "NEW_PROJECT" ],
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "policy" : {
+            "$ref" : "#/components/schemas/WorkspacePolicy"
+          },
+          "yourRole" : {
+            "enum" : [ "VIEWER", "OPERATOR", "APPROVER", "ADMIN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "createdAt", "id", "kind", "name", "policy", "yourRole" ],
+        "type" : "object"
+      }
+    }
+  },
+  "info" : {
+    "description" : "Projects, repositories, runs, approvals and per-user connections. Errors are RFC 7807 problem+json with a stable `code`.",
+    "title" : "DevForge AI API",
+    "version" : "1.0.0-m1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/v1/adapter-types" : {
+      "get" : {
+        "operationId" : "adapterTypes",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AdapterType"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "provider-controller" ]
+      }
+    },
+    "/api/v1/admin/audit" : {
+      "get" : {
+        "operationId" : "audit",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "action",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/AuditEventView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-controller" ]
+      }
+    },
+    "/api/v1/admin/provider-instances" : {
+      "get" : {
+        "operationId" : "list_3",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "kind",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "AI_PROVIDER", "GIT_HOST", "TRACKER" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProviderInstanceView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "provider-controller" ]
+      },
+      "post" : {
+        "operationId" : "create_3",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateProviderRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProviderInstanceView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "provider-controller" ]
+      }
+    },
+    "/api/v1/admin/provider-instances/{id}" : {
+      "delete" : {
+        "operationId" : "remove",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "provider-controller" ]
+      },
+      "patch" : {
+        "operationId" : "update_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateProviderRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProviderInstanceView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "provider-controller" ]
+      }
+    },
+    "/api/v1/admin/vault/rotate" : {
+      "post" : {
+        "operationId" : "rotate",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "format" : "int32",
+                    "type" : "integer"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-controller" ]
+      }
+    },
+    "/api/v1/agent-providers" : {
+      "get" : {
+        "operationId" : "providers",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "workspaceId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProviderOption"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "agent-controller" ]
+      }
+    },
+    "/api/v1/approvals/{id}/decision" : {
+      "post" : {
+        "operationId" : "decide",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApprovalView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/v1/me/connections" : {
+      "get" : {
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ConnectionView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "connection-controller" ]
+      },
+      "post" : {
+        "operationId" : "create_2",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateConnectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConnectionView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "connection-controller" ]
+      }
+    },
+    "/api/v1/me/connections/{id}" : {
+      "delete" : {
+        "operationId" : "delete",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "connection-controller" ]
+      },
+      "patch" : {
+        "operationId" : "update_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateConnectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConnectionView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "connection-controller" ]
+      }
+    },
+    "/api/v1/me/connections/{id}/verify" : {
+      "post" : {
+        "operationId" : "verify",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ConnectionView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "connection-controller" ]
+      }
+    },
+    "/api/v1/project-types" : {
+      "get" : {
+        "operationId" : "projectTypes",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ProjectTypeDefinition"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}" : {
+      "get" : {
+        "operationId" : "get_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RunView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/actions/{action}" : {
+      "post" : {
+        "operationId" : "act",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "action",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ActionBody"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RunView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/artifacts" : {
+      "get" : {
+        "operationId" : "artifacts",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ArtifactView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/changes" : {
+      "get" : {
+        "operationId" : "changes",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ChangeView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/events" : {
+      "get" : {
+        "operationId" : "stream",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Last-Event-ID",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/EventView"
+                  },
+                  "type" : "array"
+                }
+              },
+              "text/event-stream" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SseEmitter"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/findings" : {
+      "get" : {
+        "operationId" : "findings",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/FindingView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/steps" : {
+      "get" : {
+        "operationId" : "steps",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/StepView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/runs/{id}/validations" : {
+      "get" : {
+        "operationId" : "validations",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ValidationView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/workspaces" : {
+      "get" : {
+        "operationId" : "list",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/WorkspaceView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "post" : {
+        "operationId" : "create",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateWorkspaceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkspaceView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}" : {
+      "get" : {
+        "operationId" : "get",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkspaceView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "patch" : {
+        "operationId" : "update",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateWorkspaceRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkspaceView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}/members" : {
+      "get" : {
+        "operationId" : "members",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/Member"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "put" : {
+        "operationId" : "setMember",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetMemberRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Member"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}/members/{userId}" : {
+      "delete" : {
+        "operationId" : "removeMember",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}/repositories" : {
+      "get" : {
+        "operationId" : "repositories",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/WorkspaceRepoView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "post" : {
+        "operationId" : "addRepository",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AddRepositoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkspaceRepoView"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}/repositories/{repoId}" : {
+      "delete" : {
+        "operationId" : "removeRepository",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "repoId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "patch" : {
+        "operationId" : "updateRepository",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "repoId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateRepositoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkspaceRepoView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}/repositories/{repoId}/refresh" : {
+      "post" : {
+        "operationId" : "refresh",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "repoId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WorkspaceRepoView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}/tracker" : {
+      "delete" : {
+        "operationId" : "clearTracker",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "get" : {
+        "operationId" : "tracker",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrackerView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "put" : {
+        "operationId" : "setTracker",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SetTrackerRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrackerView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/approvals" : {
+      "get" : {
+        "operationId" : "list_4",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "workspaceId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "runId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "PENDING", "APPROVED", "REJECTED", "SUPERSEDED", "EXPIRED" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/ApprovalView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "approval-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/runs" : {
+      "get" : {
+        "operationId" : "list_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "workspaceId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "enum" : [ "CREATED", "INPUT_RETRIEVAL", "AWAITING_INPUT", "CONTEXT_GATHERING", "INVESTIGATION", "FINDINGS_AVAILABLE", "PROPOSING_FIX", "FIX_PROPOSAL_AVAILABLE", "AWAITING_APPROVAL", "IMPLEMENTATION", "VALIDATION", "AWAITING_REVIEW", "PR_PREPARATION", "COMPLETED", "FAILED", "CANCELLED" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "items" : {
+                    "$ref" : "#/components/schemas/RunView"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      },
+      "post" : {
+        "operationId" : "create_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "workspaceId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateRunRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RunView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "run-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{workspaceId}/tickets/{key}" : {
+      "get" : {
+        "operationId" : "get_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "workspaceId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Ticket"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ticket-controller" ]
+      }
+    }
+  },
+  "servers" : [ {
+    "description" : "Generated server url",
+    "url" : "http://localhost"
+  } ]
+}

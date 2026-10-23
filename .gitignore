@@ -1,0 +1,20 @@
+# secrets and local config
+.env
+.env.*
+!.env.example
+
+# build output
+node_modules/
+dist/
+target/
+build/
+*.log
+.DS_Store
+.idea/
+.vscode/
+
+# test output
+frontend/playwright-report/
+frontend/test-results/
+frontend/coverage/
+.dev/

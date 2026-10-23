@@ -1,0 +1,28 @@
+# ADR-0014: Investigation loop, tool policy, and mode gating
+**Status:** Proposed (implemented in M2; verified against a scripted provider only — see "What is not verified")
+
+## Context
+M2 puts a real model in the investigation step. The model is untrusted: it can be wrong, can be manipulated by ticket or repository text, and can ask for things it must not get. The rest of the platform (workflow, approvals, evidence) must not change shape.
+
+## Decisions
+1. **One bounded loop behind `AgentSteps.investigate`.** The model proposes tool calls; the platform decides and executes them; the loop ends on `submit_findings` or a limit. Limits (all configurable, `devforge.agent.*`): 24 turns, 40 tool calls, 300k tokens, 8 min wall clock, 120 s per model call, 12k chars per tool result. Hitting a limit does **not** discard work: the loop makes one last call offering only `submit_findings`, and the run is marked *incomplete* with the reason. Cancellation is checked before every model call.
+2. **Final answer through a tool (`submit_findings`), not free text or native schema mode.** It works identically across providers, is validated server-side (bad output is sent back for up to 2 repairs), and cannot be mistaken for chat.
+3. **Four read-only tools** (`repo_list_files`, `repo_search_files`, `repo_grep`, `repo_read`) scoped to the run's own repositories at their pinned commits. The policy lives in `RepoToolbox`, not in the prompt: unknown tools and repositories are denied; arguments are validated and size-capped; sensitive files and path traversal are refused by the repository layer; refusals come back to the model as messages and are recorded in the trace. Nothing can write, execute, or reach the network. The offered tool list never changes during a run, whatever the model or the files say.
+4. **Untrusted data is fenced.** The ticket is wrapped in `<ticket>` (it cannot close its own fence); repository output is labelled as untrusted data; platform refusals are not. The system prompt (`prompts/investigator-v1.md`, versioned) states the rules, but enforcement never relies on the model obeying it.
+5. **Trust is decided by the server.** Findings go through the same verification as before: every citation is re-read from the pinned commit, and `EvidenceJudge` downgrades what cannot be confirmed (one shared rule used by the workflow and the evals). Citations to repositories outside the run are rejected.
+6. **Credentials.** `RealAgentSteps` lends the run owner's secret to a single model call through `CredentialContext`; a fresh vendor client is built per call and nothing is cached. A deleted or rejected connection pauses the run (`AWAITING_INPUT/CREDENTIAL`); it never falls back to another key. ArchUnit rules enforce: vendor libraries only in `agent.internal.anthropic`, `Connections.reveal` only from the investigation code and identity, and the workflow never touches either.
+7. **No hidden retries.** The vendor library's own retries are disabled (it masked the real error); transient failures are retried by the workflow with backoff and visible `RETRYING` events; `AUTH_INVALID` and `QUOTA_EXHAUSTED` are never retried.
+8. **Mode gating.** With a real provider only *Investigate only* runs are allowed: the API refuses the other modes (`MODE_NOT_AVAILABLE_FOR_PROVIDER`), `nextActions` omits *request-fix*, and the UI disables them. Fix proposals, patches and validation with a real model are a later milestone. Whether a provider is real or simulated is one platform setting, `devforge.agent.mode` (`simulated` default | `real`).
+9. **Live model list.** Verifying a key calls the provider's model-list endpoint (free) and remembers what that key can run (in memory). The picker marks built-in models the key cannot see as unavailable, matches dated variants by prefix, and offers unrecognised models the key can run as "discovered".
+10. **Job queues are named** (`devforge.workflow.queue-name`): a worker only claims jobs of its queue. This isolates test contexts and allows routing later.
+
+## Evaluation
+Golden cases live in `backend/src/test/resources/eval/cases` as data (repositories, ticket, scripted model transcript, expectations). The **replay gate** runs them through the production loop and verifier on every build (file recall, citation validity, unsupported-claim count, refusals, no secret reaching the model, dishonest citations downgraded). The transcripts are **synthetic**: they gate the pipeline, not model quality. `LiveEvalTest` runs the same cases against the real model when `ANTHROPIC_API_KEY` is set and writes `target/eval/live-report.json`; only safety invariants fail it, quality numbers are reported for trending.
+
+## What is not verified
+Behaviour of the real service (tool-call quirks, real error bodies, rate limits, prompt quality, token cost, whether the seeded model ids match the live list) is untested: M2 was built and tested against a scripted local server and replayed transcripts because no API key was available. Treat the first live run as a validation step (`LiveEvalTest`), not a formality.
+
+## Consequences
++ Safe by construction regardless of model behaviour; partial results survive limits; evals are cheap and deterministic. − Prompt and tool design are untuned until measured on a real model; lexical `repo_search_files` is only a starting aid (R24).
+## Revisit when
+Live evals show the loop missing multi-hop paths (add an outline/symbol tool), token cost is too high (prompt caching, summarising old tool results), or a second provider needs capability-specific handling (ADR-0013 / M2b).

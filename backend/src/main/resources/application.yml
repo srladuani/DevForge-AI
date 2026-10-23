@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: devforge-backend
+  datasource:
+    url: ${DEVFORGE_DB_URL:jdbc:postgresql://localhost:5432/devforge}
+    username: ${DEVFORGE_DB_USER:devforge}
+    password: ${DEVFORGE_DB_PASSWORD:devforge}
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  # 8787 rather than 8080: 8080 and 9090 are commonly taken by other local dev servers.
+  port: ${DEVFORGE_PORT:8787}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+devforge:
+  agent:
+    # simulated: the built-in simulation (no model). real: Claude through the Anthropic API using each user's own key.
+    mode: ${DEVFORGE_AGENT_MODE:simulated}
+    max-turns: 24            # model round trips per investigation
+    max-tool-calls: 40
+    max-run-tokens: 300000   # input + output tokens per investigation
+    step-timeout: PT8M
+    request-timeout: PT120S  # one model call
+    max-tool-output-chars: 12000
+  security:
+    # Vault master keys by version (base64, 32 bytes). Rotate by adding a new version and raising current-key-version.
+    current-key-version: 1
+    keys:
+      1: ${DEVFORGE_MASTER_KEY:}
+    dev-admins: ${DEVFORGE_DEV_ADMINS:}
+  providers:
+    # Inserted only on first boot (empty table); afterwards the table is edited from Admin settings.
+    seed:
+      - { kind: AI_PROVIDER, adapter-type: ANTHROPIC, display-name: "Claude (Anthropic)" }
+      - { kind: AI_PROVIDER, adapter-type: OPENAI, display-name: "OpenAI" }
+      - { kind: AI_PROVIDER, adapter-type: GEMINI, display-name: "Gemini (Google)" }
+      - { kind: TRACKER, adapter-type: JIRA_MCP, display-name: "Jira (via MCP)" }

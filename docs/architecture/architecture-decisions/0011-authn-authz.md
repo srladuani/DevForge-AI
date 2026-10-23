@@ -1,0 +1,6 @@
+# ADR-0011: Authentication and authorization
+**Status:** Proposed — depends on open question Q3 (deployment model)
+## Decision
+Spring Security resource server. Phase 1 targets an internal, single-organisation deployment: **OIDC login** (company IdP) is the target; for local dev a profile with a seeded local user. Authorization: workspace-scoped roles `VIEWER`, `OPERATOR` (start runs, approve investigation→fix), `APPROVER` (approve external writes), `ADMIN` (integrations, policy, repos). Repository access is granted per workspace-repo; every API call and tool execution checks `(user, workspace, repo, action)`. Approvals record the approver, the exact approved artefact hash, and expire. Separation of duty (optional policy): requester ≠ approver for PR push.
+Credential classes: (1) **per-user AI-provider credentials** — owned by the user, stored in the vault, used only for that user's runs (ADR-0012); (2) **project service credentials** (tracker, Git host) — admin-configured secret references, never user-visible; (3) platform secrets (DB, master key) via env/secret store through `SecretResolver`. **Sessions are user-based:** a run is owned by one user; only the owner drives LLM calls on it; other members can view or approve according to their role.
+Deployment: one organisation per deployment (no tenant isolation layer yet).
