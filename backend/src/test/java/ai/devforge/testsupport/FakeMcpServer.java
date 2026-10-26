@@ -33,6 +33,8 @@ public final class FakeMcpServer implements AutoCloseable {
     public volatile boolean eventStream;
     public volatile boolean noticeBeforeJson = true;
     public volatile boolean junkInsteadOfJson;
+    /** the login service this server says it uses (OAuth protected-resource metadata); null = it does not offer OAuth */
+    public volatile String authorizationServer;
     /** every tools/call answers with this error text (isError), e.g. a scope problem */
     public volatile String toolCallError;
     /** 0 = every tool in one answer; otherwise tools/list is paginated with a nextCursor, as the real server does */
@@ -80,6 +82,10 @@ public final class FakeMcpServer implements AutoCloseable {
     private void handle(HttpExchange ex) throws IOException {
         String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         String auth = ex.getRequestHeaders().getFirst("Authorization");
+        if (ex.getRequestURI().getPath().equals("/.well-known/oauth-protected-resource/v2/mcp") && authorizationServer != null) {
+            reply(ex, 200, "application/json", "{\"resource\":\"" + url() + "\",\"authorization_servers\":[\"" + authorizationServer + "\"]}");
+            return;
+        }
         if (!authorised(auth)) {
             ex.getResponseHeaders().add("WWW-Authenticate", "Bearer resource_metadata=\"https://example.invalid/.well-known/oauth-protected-resource\"");
             reply(ex, 401, "application/json", "{\"error\":\"unauthorized\"}");

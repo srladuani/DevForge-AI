@@ -71,6 +71,33 @@ class ConnectionService implements Connections {
         return get(id, userId);
     }
 
+    @Override
+    @Transactional
+    public ConnectionView saveOAuth(UUID userId, ConnectionKind kind, String providerType, String label, String secret, ConnectionStatus status, String statusMessage) {
+        UUID existing = jdbc.sql("select id from connection where user_id = ? and kind = ? and provider_type = ? and auth_method = 'OAUTH' order by created_at limit 1")
+            .params(userId, kind.name(), providerType).query(UUID.class).optional().orElse(null);
+        UUID id;
+        if (existing == null) {
+            id = create(userId, kind, providerType, AuthMethod.OAUTH, label, secret).id();
+        } else {
+            id = existing;
+            var sealed = cipher.seal(secret, id, userId);
+            jdbc.sql("update connection set encrypted_secret = ?, key_version = ?, label = ?, updated_at = now() where id = ?").params(sealed.blob(), sealed.keyVersion(), label, id).update();
+            audit.record(userId.toString(), "CONNECTION_SECRET_REPLACED", "connection", id.toString(), kind + "/" + providerType + " via OAUTH");
+        }
+        jdbc.sql("update connection set status = ?, status_message = ?, last_verified_at = ?, updated_at = now() where id = ?")
+            .params(status.name(), statusMessage, Timestamp.from(Instant.now(clock)), id).update();
+        return get(id, userId);
+    }
+
+    @Override
+    @Transactional
+    public void replaceSecret(UUID connectionId, UUID ownerUserId, String secret) {
+        get(connectionId, ownerUserId); // 404 unless it is theirs
+        var sealed = cipher.seal(secret, connectionId, ownerUserId);
+        jdbc.sql("update connection set encrypted_secret = ?, key_version = ?, updated_at = now() where id = ?").params(sealed.blob(), sealed.keyVersion(), connectionId).update();
+    }
+
     @Transactional
     ConnectionView update(UUID id, UUID userId, String label, String newSecret) {
         ConnectionView existing = get(id, userId);
@@ -97,7 +124,7 @@ class ConnectionService implements Connections {
     ConnectionView verify(UUID id, UUID userId) {
         ConnectionView c = get(id, userId);
         ConnectionVerifier.Result result = verifiers.stream().filter(v -> v.supports(c.kind(), c.providerType())).findFirst()
-            .map(v -> v.verify(id, reveal(id, userId)))
+            .map(v -> v.verify(id, userId, reveal(id, userId)))
             .orElse(new ConnectionVerifier.Result(ConnectionStatus.UNVERIFIED, "No verifier is available for " + c.providerType()));
         jdbc.sql("update connection set status = ?, status_message = ?, last_verified_at = ?, updated_at = now() where id = ?")
             .params(result.status().name(), result.message(), Timestamp.from(Instant.now(clock)), id).update();

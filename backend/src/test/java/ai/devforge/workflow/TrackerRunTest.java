@@ -239,4 +239,21 @@ class TrackerRunTest extends WorkflowTestBase {
         api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.containsString("data: {note: text, count: number}"), org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("nothing here")))));
     }
+
+    @Test
+    void aTicketWrappedInDataOrFlattenedOrSentAsTextIsStillRead() throws Exception {
+        verified("owner", "owner@example.test:tok-valid");
+        bindTracker();
+        String classic = FakeMcpServer.sampleIssue("PBX-8", "Wrapped in data");
+        mcp.issue("PBX-8", "{\"data\":" + classic + "}");
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-8").andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Wrapped in data")).andExpect(jsonPath("$.status").value("To Do"));
+        mcp.issue("PBX-9", "{\"data\":{\"key\":\"PBX-9\",\"summary\":\"Flattened\",\"status\":\"In Progress\",\"priority\":{\"name\":\"High\"},\"description\":\"Steps: open the page\",\"labels\":[\"support\"]}}");
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-9").andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Flattened")).andExpect(jsonPath("$.status").value("In Progress"))
+            .andExpect(jsonPath("$.description").value("Steps: open the page"));
+        mcp.issue("PBX-10", "{\"data\":" + tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(classic) + "}"); // the ticket JSON sent as a text value
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-10").andExpect(status().isOk()).andExpect(jsonPath("$.title").value("Wrapped in data"));
+        mcp.issue("PBX-11", "{\"data\":{\"message\":\"nothing useful\",\"count\":0}}");
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-11").andExpect(status().isBadGateway())
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.containsString("data: {message: text, count: number}"), org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("nothing useful")))));
+    }
 }

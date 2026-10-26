@@ -38,7 +38,12 @@ class JiraTrackers implements Trackers {
     private final Providers providers;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-    JiraTrackers(Providers providers) { this.providers = providers; }
+    private final OAuthTokens oauthTokens;
+
+    JiraTrackers(Providers providers, OAuthTokens oauthTokens) {
+        this.providers = providers;
+        this.oauthTokens = oauthTokens;
+    }
 
     @Override
     public boolean supports(String providerType) { return TYPE.equals(providerType); }
@@ -46,7 +51,9 @@ class JiraTrackers implements Trackers {
     @Override
     public Ticket fetch(String providerType, TrackerCredential credential, @Nullable String siteHint, String key) {
         if (!supports(providerType)) throw new TrackerException(Kind.NOT_CONFIGURED, "Unsupported tracker: " + providerType);
-        McpClient mcp = new McpClient(endpoint(), credential.secret().get(), http, Duration.ofSeconds(30));
+        String secret = credential.secret().get();
+        boolean signedIn = ai.devforge.integration.internal.oauth.OAuthSecret.looksLikeOAuth(secret);
+        McpClient mcp = new McpClient(endpoint(), signedIn ? oauthTokens.accessToken(credential) : secret, http, Duration.ofSeconds(30), signedIn);
         // servers name their tools' parameters differently across versions, so ask what this one expects instead of assuming
         Map<String, McpClient.Tool> tools = new java.util.HashMap<>();
         mcp.listToolSpecs().forEach(t -> tools.putIfAbsent(t.name(), t));
@@ -157,10 +164,32 @@ class JiraTrackers implements Trackers {
 
     /** Some servers wrap the issue ({"issue": {...}}) or return its fields at the top level; accept those shapes too. */
     static JsonNode unwrap(JsonNode issue) {
-        if (issue.path("fields").isObject()) return issue;
-        if (issue.path("issue").path("fields").isObject()) return issue.path("issue");
-        return issue;
+        JsonNode found = findIssue(issue, 0);
+        return found != null ? found : issue;
     }
+
+    /** The object that holds the ticket: it has a "fields" object (the classic shape) or a "summary" itself (flattened). Searched through wrappers such as data, result, issue or content. */
+    private static @Nullable JsonNode findIssue(JsonNode n, int depth) {
+        if (depth > 4) return null;
+        if (n.isString() && n.asString().strip().startsWith("{")) {
+            try {
+                return findIssue(JSON_TEXT.readTree(n.asString()), depth + 1); // a server may send the JSON as text
+            } catch (RuntimeException notJson) {
+                return null;
+            }
+        }
+        if (n.isArray()) return n.isEmpty() ? null : findIssue(n.get(0), depth + 1);
+        if (!n.isObject()) return null;
+        if (n.path("fields").isObject() && !n.path("fields").isEmpty()) return n;
+        if (n.path("summary").isString() && !n.path("summary").asString().isBlank()) return n;
+        for (String wrapper : List.of("issue", "data", "result", "content", "value")) {
+            JsonNode r = findIssue(n.path(wrapper), depth + 1);
+            if (r != null) return r;
+        }
+        return null;
+    }
+
+    private static final tools.jackson.databind.json.JsonMapper JSON_TEXT = tools.jackson.databind.json.JsonMapper.builder().build();
 
     private static JsonNode commentsOf(JsonNode issue) {
         JsonNode f = issue.path("fields").isObject() ? issue.path("fields") : issue;
@@ -187,9 +216,7 @@ class JiraTrackers implements Trackers {
         JsonNode issue = unwrap(rawIssue);
         JsonNode f = issue.path("fields").isObject() ? issue.path("fields") : issue;
         if (f.path("summary").asString("").isBlank()) {
-            List<String> names = new ArrayList<>();
-            rawIssue.propertyNames().forEach(names::add);
-            throw new TrackerException(Kind.BAD_RESPONSE, "The ticket data was not in the expected shape (top-level fields: " + String.join(", ", names.stream().limit(20).toList()) + ")");
+            throw new TrackerException(Kind.BAD_RESPONSE, "The ticket data was not in the expected shape (reply: " + shape(rawIssue, 0) + ")");
         }
         List<String> labels = new ArrayList<>();
         f.path("labels").forEach(l -> labels.add(l.asString("")));
@@ -211,7 +238,8 @@ class JiraTrackers implements Trackers {
     }
 
     private static @Nullable String name(JsonNode f, String field) {
-        String n = f.path(field).path("name").asString("");
+        JsonNode v = f.path(field);
+        String n = v.isString() ? v.asString("") : v.path("name").asString(v.path("value").asString(""));
         return n.isBlank() ? null : n;
     }
 

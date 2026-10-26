@@ -42,7 +42,7 @@ class SecurityConfig {
                 // error pages through ERROR; re-checking there would fail with "response already committed" because the stateless
                 // authentication does not exist on those dispatches.
                 .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
-                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/v3/api-docs", "/v3/api-docs/**", "/api/v1/auth/config").permitAll()
+                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/v3/api-docs", "/v3/api-docs/**", "/api/v1/auth/config", "/api/v1/oauth/callback").permitAll()
                 // operational data (queue depth, token spend, error rates) is for operators, not every signed-in user
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 // admin endpoints are also checked here, before any request body is read, so a non-admin learns nothing from validation errors

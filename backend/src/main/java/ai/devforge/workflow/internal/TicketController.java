@@ -41,7 +41,7 @@ class TicketController {
                 case NOT_CONFIGURED, AMBIGUOUS_SITE -> DomainException.unprocessable("TRACKER_" + e.kind(), e.getMessage());
                 case AUTH_INVALID -> new DomainException("TRACKER_AUTH_INVALID", HttpStatus.UNPROCESSABLE_ENTITY, "The tracker rejected your connection (" + e.getMessage() + "). Update it under My connections.");
                 case NOT_FOUND -> DomainException.notFound("TICKET_NOT_FOUND", "The ticket was not found, or your account cannot see it");
-                case UNAVAILABLE, BAD_RESPONSE -> new DomainException("TRACKER_UNAVAILABLE", HttpStatus.BAD_GATEWAY, "The tracker could not be read right now; try again, or paste the ticket text");
+                case UNAVAILABLE, BAD_RESPONSE -> new DomainException("TRACKER_UNAVAILABLE", HttpStatus.BAD_GATEWAY, "The tracker could not be read: " + e.getMessage() + ". Try again, or paste the ticket text.");
             };
         }
     }

@@ -1,3 +1,11 @@
+# Every distinct test configuration starts its own application context and keeps it for the whole run; with the default pool of 10 each one,
+# a dozen contexts exhaust the test database's 100 connections ("too many clients" while loading a context).
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 6
+      minimum-idle: 0
+
 # Test-only vault keys (random, never used anywhere else).
 devforge:
   security:

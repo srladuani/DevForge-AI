@@ -1,4 +1,5 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router'
 import { Alert, Empty, Spinner } from '../../components/ui/Alert'
 import { Badge, type Tone } from '../../components/ui/Badge'
 import { Button } from '../../components/ui/Button'
@@ -6,8 +7,9 @@ import { Card, CardHeader } from '../../components/ui/Card'
 import { Dialog } from '../../components/ui/Dialog'
 import { Input, Select } from '../../components/ui/Field'
 import { errorMessage } from '../../lib/api/client'
+import { goTo } from '../../lib/navigation'
 import { timeAgo, titleCase } from '../../lib/format'
-import { useAdapterTypes, useConnections, useCreateConnection, useDeleteConnection, useVerifyConnection, type AdapterType, type Connection } from './api'
+import { useAdapterTypes, useConnections, useCreateConnection, useDeleteConnection, useStartSignIn, useVerifyConnection, type AdapterType, type Connection } from './api'
 
 type Kind = Connection['kind']
 type Auth = Connection['authMethod']
@@ -29,9 +31,25 @@ function authLabel(a: Auth): string {
   return a === 'API_KEY' ? 'API key' : a === 'PAT' ? 'Access token' : 'Sign in with OAuth'
 }
 
+/** What the browser carries back from a single sign-on page: ?oauth=success, or ?oauth=error&reason=… (kept in page state, then removed from the address). */
+function useSignInResult(): { outcome: 'success' | 'error'; reason: string } | null {
+  const [params, setParams] = useSearchParams()
+  // the page is opened fresh by the redirect, so the first render holds the answer; it is kept, and the address is cleaned afterwards
+  const [result] = useState<{ outcome: 'success' | 'error'; reason: string } | null>(() => {
+    const seen = params.get('oauth')
+    return seen === 'success' || seen === 'error' ? { outcome: seen, reason: params.get('reason') ?? '' } : null
+  })
+  const hasResultInAddress = params.has('oauth')
+  useEffect(() => {
+    if (hasResultInAddress) setParams({}, { replace: true })
+  }, [hasResultInAddress, setParams])
+  return result
+}
+
 export function ConnectionsPage() {
   const connections = useConnections()
   const adapters = useAdapterTypes()
+  const signInResult = useSignInResult()
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <div>
@@ -41,6 +59,9 @@ export function ConnectionsPage() {
       <Alert tone="info" title="How your keys are handled">
         A key is encrypted when you save it and can never be shown again, not even to you. It is used only for runs you start, and it never appears in prompts, logs or this page. To change it, replace it.
       </Alert>
+
+      {signInResult?.outcome === 'success' && <Alert tone="ok" title="Signed in">Your single sign-on connection was saved and checked. It appears below; the project’s tracker can now read tickets with it.</Alert>}
+      {signInResult?.outcome === 'error' && <Alert tone="danger" title="Single sign-on did not complete">{signInResult.reason || 'The sign-in was not completed.'} You can try again below.</Alert>}
 
       {connections.isPending && <Spinner label="Loading connections" />}
       {connections.error && <Alert tone="danger" title="Could not load connections">{errorMessage(connections.error)}</Alert>}
@@ -102,6 +123,7 @@ function ConnectionRow({ c, adapter }: { c: Connection; adapter: AdapterType | u
 
 function AddConnection({ adapters }: { adapters: AdapterType[] }) {
   const create = useCreateConnection()
+  const signIn = useStartSignIn()
   const [kind, setKind] = useState<Kind>('AI_PROVIDER')
   const forKind = useMemo(() => adapters.filter((a) => a.kind === kind), [adapters, kind])
   const [provider, setProvider] = useState('ANTHROPIC')
@@ -111,6 +133,7 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
   const [saved, setSaved] = useState(false)
 
   const adapter = forKind.find((a) => a.type === provider) ?? forKind[0]
+  const singleSignOn = adapter !== undefined && adapter.kind === 'TRACKER' && adapter.availability === 'REAL' && adapter.authMethods.includes('OAUTH')
   const usableAuth = adapter?.authMethods.filter((m) => m !== 'OAUTH') ?? []
 
   function changeKind(k: Kind) {
@@ -169,8 +192,25 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
             ))}
           </Select>
         </div>
+        {singleSignOn && adapter && (
+          <div className="space-y-2 rounded-md border border-border bg-surface-2 p-3 text-sm">
+            <p className="font-medium">Sign in with single sign-on</p>
+            <p className="text-muted">
+              Use this when your organisation does not allow API tokens (a token then fails with “You don’t have permission to connect via API token”). You sign in on {adapter.displayName}’s own page; DevForge never sees your password and
+              only asks for read access. The tokens are stored encrypted and renewed automatically.
+            </p>
+            {signIn.error && <Alert tone="danger" title="Could not start the sign-in">{errorMessage(signIn.error)}</Alert>}
+            <Button
+              variant="primary"
+              busy={signIn.isPending}
+              onClick={() => signIn.mutate({ providerType: adapter.type, label: label.trim() || 'Single sign-on' }, { onSuccess: (r) => goTo(r.authorizationUrl) })}
+            >
+              Sign in with {adapter.displayName}
+            </Button>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select label="How you sign in" value={auth} onChange={(e) => setAuth(usableAuth.find((m) => m === e.target.value) ?? 'API_KEY')} hint={adapter?.authMethods.includes('OAUTH') ? 'Sign-in with OAuth is not available yet; use a token.' : undefined}>
+          <Select label="How you sign in" value={auth} onChange={(e) => setAuth(usableAuth.find((m) => m === e.target.value) ?? 'API_KEY')} hint={singleSignOn ? 'Or use single sign-on above.' : adapter?.authMethods.includes('OAUTH') ? 'Sign-in with OAuth is not available for this provider yet; use a token.' : undefined}>
             {usableAuth.map((m) => (
               <option key={m} value={m}>
                 {authLabel(m)}

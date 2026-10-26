@@ -8,6 +8,15 @@ import java.util.UUID;
 public interface Connections {
     List<ConnectionView> listFor(UUID userId);
 
+    /**
+     * Stores the result of a sign-in with an external provider (OAuth tokens as one encrypted secret). The person's existing OAuth connection for
+     * this provider is replaced in place; otherwise a new one is created.
+     */
+    ConnectionView saveOAuth(UUID userId, ConnectionKind kind, String providerType, String label, String secret, ConnectionStatus status, String statusMessage);
+
+    /** Replaces a connection's secret without touching its status (used when an OAuth access token is refreshed). */
+    void replaceSecret(UUID connectionId, UUID ownerUserId, String secret);
+
     /** The user's most recently verified-valid connection of this type, if any. */
     Optional<ConnectionView> findUsable(UUID userId, ConnectionKind kind, String providerType);
 

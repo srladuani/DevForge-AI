@@ -18,6 +18,12 @@ Production sign-in is OpenID Connect; the local development sign-in (`local` pro
 4. Serve the UI and `/api` from the **same origin** (a reverse proxy); the API sends no CORS headers.
 People are created on first sign-in and then added to projects by a project admin (by email). If the provider is unreachable the application still starts; sign-ins fail until it is back. **Not verified against a real provider** (token validation and the browser flow are tested with a locally signed token and a fake `UserManager`).
 
+## Single sign-on for Jira (OAuth)
+Some Atlassian organisations do not allow API tokens on the MCP server (an API-token call then fails with "You don't have permission to connect via API token"). People can instead press **Sign in with Jira (via MCP)** under *My connections*. DevForge discovers Atlassian's login from the MCP server, registers itself automatically (dynamic client registration), uses authorization code + PKCE with read-only scopes plus offline access, and stores the tokens encrypted in that person's own connection, renewing them automatically (a revoked sign-in shows "sign in again").
+- The browser returns to `<DEVFORGE_OAUTH_REDIRECT_BASE>/api/v1/oauth/callback` (default `http://localhost:8080`). Behind a reverse proxy set it to the public address; Atlassian must accept that redirect address.
+- Addresses learned from Atlassian's metadata must be https and in the same organisation as the MCP server, or the sign-in is refused before anything is sent.
+- **Not verified against Atlassian:** the flow is tested against a fake login service; whether Atlassian accepts a localhost redirect address for a self-registered client is unconfirmed. If it refuses, ask the Atlassian organisation admin to allow the redirect address, or to enable API tokens (Atlassian Administration, Rovo MCP server settings).
+
 ## Configuration that matters (all `devforge.*`, env-overridable)
 | Setting | Default | Meaning |
 |---|---|---|

@@ -47,7 +47,7 @@ class TicketFetcher {
     }
 
     private Ticket fetch(String providerType, UUID connectionId, UUID ownerUserId, @org.jspecify.annotations.Nullable String site, String key) {
-        return trackers.fetch(providerType, new TrackerCredential(connectionId, ownerUserId, () -> connections.reveal(connectionId, ownerUserId)), site, key);
+        return trackers.fetch(providerType, new TrackerCredential(connectionId, ownerUserId, () -> connections.reveal(connectionId, ownerUserId), s -> connections.replaceSecret(connectionId, ownerUserId, s)), site, key);
     }
 
     /** The ticket as text for the normaliser and the investigator: routine status chatter is left out; people's emails never reach here. */

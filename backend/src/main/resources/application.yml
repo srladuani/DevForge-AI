@@ -44,6 +44,10 @@ devforge:
     work-root: ${DEVFORGE_WORK_ROOT:}
     # JDK/Node/build-tool installs the sandbox may see read-only, e.g. a version manager's install directories. Their bin/ is added to PATH.
     # toolchain-mounts: [/opt/node-22, /opt/jdk-21]
+  oauth:
+    # The address people reach this application at. After signing in to a provider (single sign-on for Jira), the browser returns to
+    # <redirect-base>/api/v1/oauth/callback, which the provider must accept. Behind a reverse proxy set it to the public address.
+    redirect-base: ${DEVFORGE_OAUTH_REDIRECT_BASE:http://localhost:8080}
   workflow:
     # finished runs older than this many days are deleted with everything they produced (0 keeps them)
     retention-days: ${DEVFORGE_RETENTION_DAYS:0}

@@ -39,7 +39,7 @@ class ApiAuthorizationMatrixTest extends WorkflowTestBase {
         if (p.startsWith("/api/v1/runs/")) p = p.replace("{id}", run);
         else if (p.startsWith("/api/v1/workspaces/")) p = p.replace("{id}", ws).replace("{workspaceId}", ws);
         return p.replace("{id}", "00000000-0000-4000-8000-000000000001").replace("{workspaceId}", ws).replace("{runId}", run).replace("{repoId}", backendId).replace("{userId}", "00000000-0000-4000-8000-000000000002")
-            .replace("{changeId}", "00000000-0000-4000-8000-000000000003").replace("{key}", "ABC-1").replace("{action}", "cancel");
+            .replace("{changeId}", "00000000-0000-4000-8000-000000000003").replace("{key}", "ABC-1").replace("{action}", "cancel").replace("{providerType}", "GITHUB"); // an unsupported type answers 422 at once: the walk must never start a real sign-in with an outside service
     }
 
     private MockHttpServletRequestBuilder request(Op op, String uri, String user) {
@@ -60,7 +60,8 @@ class ApiAuthorizationMatrixTest extends WorkflowTestBase {
             String uri = fill(op.template(), run);
             String name = op.method() + " " + op.template();
             int anonymous = mvc.perform(request(op, uri, null)).andReturn().getResponse().getStatus();
-            boolean publicByDesign = op.template().equals("/api/v1/auth/config"); // how to sign in is needed before anyone is signed in; it holds nothing secret
+            // how to sign in is needed before anyone is signed in and holds nothing secret; the OAuth callback is a browser redirect that carries no login (it trusts only a single-use state)
+            boolean publicByDesign = op.template().equals("/api/v1/auth/config") || op.template().equals("/api/v1/oauth/callback");
             if (anonymous != 401 && !publicByDesign) problems.add(name + ": unauthenticated got " + anonymous);
             int stranger = mvc.perform(request(op, uri, u("outsider"))).andReturn().getResponse().getStatus();
             if (stranger >= 500) problems.add(name + ": a stranger got a server error " + stranger);

@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { axe } from 'vitest-axe'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import * as navigation from '../../lib/navigation'
 import { adapterTypes, connection } from '../../test/fixtures'
 import { renderApp } from '../../test/render'
 import { server } from '../../test/server'
@@ -84,5 +85,50 @@ describe('My connections', () => {
     const { container } = renderApp('/connections')
     await screen.findByText('Personal key', { exact: false })
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  describe('single sign-on', () => {
+    beforeEach(() => {
+      server.use(
+        http.get('/api/v1/adapter-types', () => HttpResponse.json(adapterTypes)),
+        http.get('/api/v1/me/connections', () => HttpResponse.json([connection()])),
+      )
+    })
+
+    it('offers single sign-on for a tracker that supports it, and sends the browser to the provider’s page without ever asking for a token', async () => {
+      const goTo = vi.spyOn(navigation, 'goTo').mockImplementation(() => undefined)
+      let body: unknown
+      server.use(
+        http.post('/api/v1/me/oauth/JIRA_MCP/start', async ({ request }) => {
+          body = await request.json()
+          return HttpResponse.json({ authorizationUrl: 'https://auth.example.test/authorize?state=abc' })
+        }),
+      )
+      const user = userEvent.setup()
+      renderApp('/connections')
+      await user.selectOptions(await screen.findByLabelText('Type'), 'TRACKER')
+      expect(screen.getByText(/doesn.t allow API tokens|does not allow API tokens/i)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /sign in with jira/i }))
+      await waitFor(() => expect(goTo).toHaveBeenCalledWith('https://auth.example.test/authorize?state=abc'))
+      expect(body).toEqual({ label: 'Single sign-on' })
+      goTo.mockRestore()
+    })
+
+    it('does not offer single sign-on for a provider that only takes a key or token', async () => {
+      renderApp('/connections')
+      await screen.findByLabelText('Type')
+      expect(screen.queryByRole('button', { name: /sign in with/i })).not.toBeInTheDocument()
+    })
+
+    it('says what happened when the browser comes back from the provider, then cleans the address', async () => {
+      const first = renderApp('/connections?oauth=success')
+      expect(await screen.findByText('Signed in')).toBeInTheDocument()
+      await waitFor(() => expect(first.router.state.location.search).toBe(''))
+      first.unmount()
+      const second = renderApp('/connections?oauth=error&reason=The+provider+did+not+allow+the+sign-in+(access_denied).')
+      expect(await screen.findByText('Single sign-on did not complete')).toBeInTheDocument()
+      expect(screen.getByText(/access_denied/)).toBeInTheDocument()
+      await waitFor(() => expect(second.router.state.location.search).toBe(''))
+    })
   })
 })

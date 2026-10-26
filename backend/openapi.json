@@ -1181,6 +1181,25 @@
         },
         "type" : "object"
       },
+      "StartRequest" : {
+        "properties" : {
+          "label" : {
+            "maxLength" : 80,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Started" : {
+        "properties" : {
+          "authorizationUrl" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "authorizationUrl" ],
+        "type" : "object"
+      },
       "StepView" : {
         "properties" : {
           "attempt" : {
@@ -1892,6 +1911,74 @@
           }
         },
         "tags" : [ "connection-controller" ]
+      }
+    },
+    "/api/v1/me/oauth/{providerType}/start" : {
+      "post" : {
+        "operationId" : "start",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "providerType",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/StartRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Started"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "o-auth-controller" ]
+      }
+    },
+    "/api/v1/oauth/callback" : {
+      "get" : {
+        "operationId" : "callback",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "code",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "state",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "error",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "o-auth-controller" ]
       }
     },
     "/api/v1/project-types" : {

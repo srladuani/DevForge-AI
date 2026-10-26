@@ -41,9 +41,12 @@ public final class McpClient {
     private int nextId = 1;
     private boolean initialized;
 
-    public McpClient(String endpoint, String secret, HttpClient http, Duration timeout) {
+    public McpClient(String endpoint, String secret, HttpClient http, Duration timeout) { this(endpoint, secret, http, timeout, false); }
+
+    /** @param bearer the secret is an access token to be sent as a Bearer token whatever it contains (an OAuth token; {@code email:token} pairs are only for API tokens) */
+    public McpClient(String endpoint, String secret, HttpClient http, Duration timeout, boolean bearer) {
         this.endpoint = URI.create(endpoint);
-        this.authorization = authorizationFor(secret);
+        this.authorization = bearer ? "Bearer " + secret.strip() : authorizationFor(secret);
         this.http = http;
         this.timeout = timeout;
     }

@@ -54,3 +54,11 @@ export function useDeleteConnection() {
     onSuccess: () => invalidateAll(qc),
   })
 }
+
+/** Begins signing in to a provider with single sign-on; the answer is the provider's sign-in page address. */
+export function useStartSignIn() {
+  return useMutation({
+    mutationFn: (v: { providerType: string; label: string }) =>
+      unwrap(client.POST('/api/v1/me/oauth/{providerType}/start', { params: { path: { providerType: v.providerType } }, body: { label: v.label } })),
+  })
+}
