@@ -26,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 public final class McpClient {
     /** The only tools DevForge will call on a tracker server. Write-like tools are unreachable by construction. */
-    public static final Set<String> READ_ONLY_TOOLS = Set.of("getJiraIssue", "searchJiraIssuesUsingJql", "getAccessibleAtlassianResources", "atlassianUserInfo");
+    public static final Set<String> READ_ONLY_TOOLS = Set.of("getJiraIssue", "listJiraIssueComments", "searchJiraIssuesUsingJql", "getAccessibleAtlassianResources", "atlassianUserInfo");
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final int MAX_BODY = 2_000_000;
@@ -36,6 +36,8 @@ public final class McpClient {
     private final HttpClient http;
     private final Duration timeout;
     private String sessionId;
+    /** What is being asked right now ("tools/call getJiraIssue"), so a failure can say which request the server refused. */
+    private String context = "the handshake";
     private int nextId = 1;
     private boolean initialized;
 
@@ -52,14 +54,26 @@ public final class McpClient {
         return s.contains(":") ? "Basic " + Base64.getEncoder().encodeToString(s.getBytes(StandardCharsets.UTF_8)) : "Bearer " + s;
     }
 
-    public List<String> listTools() {
+    /** @param inputSchema the tool's JSON schema as the server describes it (parameter names differ between servers and versions) */
+    public record Tool(String name, JsonNode inputSchema) {}
+
+    private static final int MAX_TOOL_PAGES = 20;
+
+    /** Every tool the server offers. The list is paginated (a server may send 50 at a time), so follow the cursor until the end. */
+    public List<Tool> listToolSpecs() {
         initialize();
-        JsonNode result = request("tools/list", Map.of());
-        List<String> names = new ArrayList<>();
-        result.path("tools").forEach(t -> names.add(t.path("name").asString("")));
-        names.remove("");
-        return names;
+        List<Tool> tools = new ArrayList<>();
+        String cursor = null;
+        for (int page = 0; page < MAX_TOOL_PAGES; page++) {
+            JsonNode result = request("tools/list", cursor == null ? Map.of() : Map.of("cursor", cursor));
+            result.path("tools").forEach(t -> { String name = t.path("name").asString(""); if (!name.isEmpty()) tools.add(new Tool(name, t.path("inputSchema"))); });
+            cursor = result.path("nextCursor").asString("");
+            if (cursor.isEmpty()) break;
+        }
+        return tools;
     }
+
+    public List<String> listTools() { return listToolSpecs().stream().map(Tool::name).toList(); }
 
     /** Calls an allowlisted tool and returns the JSON found in its text output. */
     public JsonNode callTool(String name, Map<String, Object> arguments) {
@@ -68,7 +82,7 @@ public final class McpClient {
         JsonNode result = request("tools/call", Map.of("name", name, "arguments", arguments));
         StringBuilder text = new StringBuilder();
         result.path("content").forEach(c -> { if ("text".equals(c.path("type").asString(""))) text.append(c.path("text").asString("")).append('\n'); });
-        if (result.path("isError").asBoolean(false)) throw toolError(text.toString());
+        if (result.path("isError").asBoolean(false)) throw toolError(name, text.toString());
         return extractJson(text.toString());
     }
 
@@ -81,13 +95,14 @@ public final class McpClient {
     }
 
     private JsonNode request(String method, Map<String, Object> params) {
+        context = method.equals("tools/call") ? "tools/call " + params.get("name") : method;
         int id = nextId++;
         HttpResponse<String> res = send(Map.of("jsonrpc", "2.0", "id", id, "method", method, "params", params), true);
         JsonNode message = findResponse(res, id);
         if (message.has("error")) {
             String msg = message.path("error").path("message").asString("");
             int code = message.path("error").path("code").asInt(0);
-            throw new TrackerException(code == 401 || code == 403 ? Kind.AUTH_INVALID : Kind.BAD_RESPONSE, "Tracker server reported an error: " + truncate(msg));
+            throw new TrackerException(code == 401 || code == 403 ? Kind.AUTH_INVALID : Kind.BAD_RESPONSE, "Tracker server reported an error during " + context + " (code " + code + "): " + excerpt(msg));
         }
         return message.path("result");
     }
@@ -97,9 +112,16 @@ public final class McpClient {
             .header("Content-Type", "application/json").header("Accept", "application/json, text/event-stream");
         if (sessionId != null) b.header("Mcp-Session-Id", sessionId);
         try {
-            HttpResponse<String> res = http.send(b.POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build(), HttpResponse.BodyHandlers.ofString());
+            HttpRequest request = b.POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build();
+            HttpResponse<String> res;
+            try {
+                res = http.send(request, HttpResponse.BodyHandlers.ofString());
+            } catch (IOException first) {
+                // a pooled connection the server already closed fails like this; everything this client sends is read-only, so one fresh attempt is safe
+                res = http.send(request, HttpResponse.BodyHandlers.ofString());
+            }
             int s = res.statusCode();
-            if (s == 401 || s == 403) throw new TrackerException(Kind.AUTH_INVALID, "The tracker rejected the credential");
+            if (s == 401 || s == 403) throw new TrackerException(Kind.AUTH_INVALID, "The tracker answered HTTP " + s + " during " + context + ": " + excerpt(res.body()));
             if (s == 404 && sessionId != null) throw new TrackerException(Kind.UNAVAILABLE, "The tracker session expired");
             if (s == 429 || s >= 500) throw new TrackerException(Kind.UNAVAILABLE, "The tracker is unavailable (HTTP " + s + ")");
             if (s >= 400) throw new TrackerException(Kind.BAD_RESPONSE, "The tracker answered HTTP " + s);
@@ -151,11 +173,17 @@ public final class McpClient {
         throw new TrackerException(Kind.BAD_RESPONSE, "The tracker returned no JSON data");
     }
 
-    private static TrackerException toolError(String text) {
+    private static TrackerException toolError(String tool, String text) {
         String t = text.toLowerCase();
-        if (t.contains("401") || t.contains("unauthorized") || t.contains("forbidden") || t.contains("403") && !t.contains("not found")) return new TrackerException(Kind.AUTH_INVALID, "The tracker rejected the credential");
+        if (t.contains("401") || t.contains("unauthorized") || t.contains("forbidden") || t.contains("403") && !t.contains("not found")) return new TrackerException(Kind.AUTH_INVALID, "The tracker refused " + tool + ": " + excerpt(text));
         if (t.contains("not found") || t.contains("404") || t.contains("does not exist") || t.contains("issue does not exist")) return new TrackerException(Kind.NOT_FOUND, "The ticket was not found, or this account cannot see it");
         return new TrackerException(Kind.BAD_RESPONSE, "The tracker reported an error: " + truncate(text));
+    }
+
+    /** What the server said, shortened and scrubbed (server error text describes the request, not our secrets; credentials are masked anyway). */
+    private static String excerpt(String s) {
+        String t = s == null ? "" : ai.devforge.platform.Redactor.redact(s.replaceAll("\\s+", " ").strip());
+        return t.isEmpty() ? "(no details)" : t.length() <= 240 ? t : t.substring(0, 240) + "…";
     }
 
     private static String truncate(String s) { return s.length() <= 200 ? s.strip() : s.substring(0, 200).strip() + "…"; }

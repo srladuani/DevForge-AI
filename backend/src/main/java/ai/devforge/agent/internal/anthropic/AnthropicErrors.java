@@ -18,6 +18,47 @@ import java.util.Locale;
 final class AnthropicErrors {
     private AnthropicErrors() {}
 
+    private static final tools.jackson.databind.json.JsonMapper JSON = tools.jackson.databind.json.JsonMapper.builder().build();
+
+    /** The provider's own error type and message (what Anthropic returns is about the request, not secrets), scrubbed and shortened, so a failure can be diagnosed. */
+    static String detail(Throwable root, String secret) {
+        String body = root instanceof HttpException || root instanceof InvalidRequestException || root instanceof AuthenticationException || root instanceof RateLimitException ? root.getMessage() : null;
+        if (body == null || body.isBlank()) return "";
+        String type = "", message = body;
+        try {
+            var err = JSON.readTree(body).path("error");
+            if (err.isObject()) {
+                type = err.path("type").asString("");
+                message = err.path("message").asString(body);
+            }
+        } catch (RuntimeException notJson) {
+            // keep the raw text
+        }
+        String text = (type.isEmpty() ? "" : type + ": ") + message.replaceAll("\\s+", " ").strip();
+        if (secret != null && !secret.isBlank()) text = text.replace(secret, "***");
+        text = ai.devforge.platform.Redactor.redact(text);
+        return text.length() > 220 ? text.substring(0, 220) + "…" : text;
+    }
+
+    private static LlmException withDetail(LlmException base, Throwable root, String secret) {
+        String d = detail(root, secret);
+        return d.isEmpty() ? base : new LlmException(base.kind(), base.getMessage() + " Provider said: " + d);
+    }
+
+    static LlmException map(Throwable t, String secret) {
+        Throwable root = rootOf(t);
+        return withDetail(map(t), root, secret);
+    }
+
+    private static Throwable rootOf(Throwable t) {
+        Throwable root = t;
+        for (int i = 0; i < 6 && root.getCause() != null && root.getCause() != root; i++) {
+            if (isKnown(root)) break;
+            root = root.getCause();
+        }
+        return root;
+    }
+
     static LlmException map(Throwable t) {
         Throwable root = t;
         for (int i = 0; i < 6 && root.getCause() != null && root.getCause() != root; i++) {

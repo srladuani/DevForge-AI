@@ -47,7 +47,7 @@ class AnthropicLlmClient implements ProviderLlmClient {
         } catch (LlmException e) {
             throw e;
         } catch (RuntimeException e) {
-            throw AnthropicErrors.map(e);
+            throw AnthropicErrors.map(e, secret);
         }
     }
 

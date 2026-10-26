@@ -72,7 +72,7 @@ class InputRetrievalHandler implements StepHandler {
             } catch (TrackerException e) {
                 switch (e.kind()) {
                     case AUTH_INVALID -> {
-                        store.appendEvent(run.id(), "NEEDS_INPUT", Map.of("reason", "CREDENTIAL", "problem", e.kind().name(), "message", "The tracker rejected your connection; update it under My connections, then resume"));
+                        store.appendEvent(run.id(), "NEEDS_INPUT", Map.of("reason", "CREDENTIAL", "problem", e.kind().name(), "message", "The tracker rejected your connection (" + e.getMessage() + "); update it under My connections, then resume"));
                         return Outcome.await("CREDENTIAL", RunStatus.INPUT_RETRIEVAL, "tracker credential rejected");
                     }
                     case NOT_FOUND, NOT_CONFIGURED, AMBIGUOUS_SITE -> {

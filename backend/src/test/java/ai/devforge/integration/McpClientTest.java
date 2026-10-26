@@ -30,6 +30,14 @@ class McpClientTest {
     }
 
     @Test
+    void followsThePaginatedToolListToTheEndSoNoToolIsMissed() {
+        server.toolNames = java.util.List.of("a1", "a2", "a3", "a4", "a5", "getJiraIssue", "z9");
+        server.pageSize = 2;
+        assertThat(client("tok-valid").listTools()).containsExactly("a1", "a2", "a3", "a4", "a5", "getJiraIssue", "z9");
+        assertThat(server.methods().stream().filter(m -> m.equals("tools/list")).count()).as("one request per page").isEqualTo(4);
+    }
+
+    @Test
     void readsAnEventStreamReplyAndJsonAfterANoticeAndEmailTokenPairsAreSentAsBasic() {
         server.eventStream = true;
         var issue = client("someone@example.test:tok-valid").callTool("getJiraIssue", Map.of("cloudId", "cloud-1", "issueIdOrKey", "ABC-1"));

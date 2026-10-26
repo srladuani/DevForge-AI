@@ -24,7 +24,12 @@ class JiraConnectionVerifier implements ConnectionVerifier {
     public Result verify(String secret) {
         try {
             var tools = new McpClient(jira.endpoint(), secret, http, Duration.ofSeconds(20)).listTools();
-            if (!tools.contains("getJiraIssue")) return new Result(ConnectionStatus.INVALID, "Connected, but this server does not offer the tool needed to read tickets");
+            if (!tools.contains("getJiraIssue")) {
+                // the credential was accepted; what is missing is the ticket-reading tool, so say what the server does offer (tool names are not secret)
+                String offered = String.join(", ", tools.stream().limit(25).toList());
+                return new Result(ConnectionStatus.INVALID, "The tracker accepted this credential, but its tool list has no `getJiraIssue`, which DevForge needs to read tickets. Tools offered ("
+                    + tools.size() + "): " + (offered.length() > 600 ? offered.substring(0, 600) + "…" : offered));
+            }
             return new Result(ConnectionStatus.VALID, "Connected to the tracker; ticket reading is available (" + tools.size() + " tools offered, only read-only ones are ever used)");
         } catch (TrackerException e) {
             return switch (e.kind()) {

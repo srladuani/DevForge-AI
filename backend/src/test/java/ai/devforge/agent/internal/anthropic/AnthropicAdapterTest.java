@@ -111,6 +111,7 @@ class AnthropicAdapterTest {
                 .isInstanceOfSatisfying(LlmException.class, e -> {
                     assertThat(e.kind()).isEqualTo(c.kind());
                     assertThat(e.getMessage()).doesNotContain("sk-secret-1").doesNotContain("private prompt");
+                    if (c.reply().status() == 400 && c.kind() == Kind.QUOTA_EXHAUSTED) assertThat(e.getMessage()).contains("Provider said: invalid_request_error: Your credit balance is too low");
                 });
         }
         assertThat(Kind.AUTH_INVALID.retryable()).isFalse();

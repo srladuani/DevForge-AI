@@ -157,6 +157,8 @@ class InvestigationLoopTest extends IntegrationTest {
         assertThat(tb.execute(call("4", "repo_read", "not json at all")).text()).startsWith("ERROR: the arguments could not be understood");
         assertThat(tb.execute(call("5", "repo_read", "{\"repo\":\"api\",\"path\":\"" + BO + "\",\"start_line\":900,\"end_line\":905}")).text()).startsWith("ERROR INVALID_RANGE");
         assertThat(tb.execute(call("6", "repo_search_files", "{\"repo\":\"api\",\"keywords\":[]}")).text()).startsWith("ERROR INVALID_KEYWORDS");
+        assertThat(tb.execute(call("6b", "repo_search_files", "{\"repo\":\"api\",\"keywords\":\"video, role\"}")).text()).as("one string of words is accepted like a list").doesNotStartWith("ERROR").contains("TrainingVideo");
+        assertThat(tb.execute(call("6c", "repo_search_files", "{\"repo\":\"api\",\"keywords\":\"   \"}")).text()).startsWith("ERROR INVALID_KEYWORDS");
         assertThat(tb.execute(call("7", "repo_list_files", "{\"repo\":\"api\",\"path_prefix\":\"..\"}")).denied()).isFalse(); // a prefix only filters git's own file list
         assertThat(tb.execute(call("8", "repo_list_files", "{\"repo\":\"api\"}")).text()).doesNotContain(".env").doesNotContain("application-prod");
         assertThat(tb.execute(call("9", "repo_grep", "{\"repo\":\"api\",\"term\":\"super-secret-password\"}")).text()).startsWith("No lines contain");

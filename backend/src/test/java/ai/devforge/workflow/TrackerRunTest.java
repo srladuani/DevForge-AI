@@ -168,4 +168,75 @@ class TrackerRunTest extends WorkflowTestBase {
         String id = trackerConnection("owner", "owner@example.test:wrong");
         api.post(u("owner"), "/api/v1/me/connections/" + id + "/verify", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("INVALID"));
     }
+
+    @Test
+    void aServerThatAcceptsTheCredentialButLacksTheTicketToolSaysWhatItDoesOffer() throws Exception {
+        mcp.toolNames = java.util.List.of("jira_get_issue", "jira_search", "confluence_get_page");
+        String id = trackerConnection("owner", "owner@example.test:tok-valid");
+        api.post(u("owner"), "/api/v1/me/connections/" + id + "/verify", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("INVALID"))
+            .andExpect(jsonPath("$.statusMessage").value(org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.containsString("accepted this credential"), org.hamcrest.Matchers.containsString("jira_get_issue, jira_search, confluence_get_page"))));
+    }
+
+    @Test
+    void aServerWithAPaginatedToolListDifferentParameterNamesAndCommentsInTheirOwnToolStillWorksEndToEnd() throws Exception {
+        mcp.toolNames = java.util.List.of("addConfluenceReaction", "createJiraIssue", "editJiraIssue", "getAccessibleAtlassianResources", "getJiraIssue", "listJiraIssueComments", "searchJiraIssuesUsingJql");
+        mcp.pageSize = 3;
+        mcp.issueKeyParam = "issueKey";
+        mcp.commentsViaSeparateTool = true;
+        verified("owner", "owner@example.test:tok-valid");
+        bindTracker();
+        String preview = api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<String>read(preview, "$.title")).startsWith("Navigation videos");
+        assertThat(JsonPath.<List<String>>read(preview, "$.comments[*].body")).containsExactly("Reproduced on staging, the TrainingVideo list endpoint ignores the role");
+        assertThat(mcp.calls().stream().map(FakeMcpServer.Call::tool)).contains("getJiraIssue", "listJiraIssueComments").doesNotContain("editJiraIssue", "createJiraIssue");
+        assertThat(mcp.calls().stream().filter(c -> c.tool().equals("getJiraIssue")).findFirst().orElseThrow().arguments().path("issueKey").asString()).isEqualTo("PBX-7");
+        String run = Api.json(rawCreate(u("owner"), ticketBody("PBX-7", null)).andExpect(status().isAccepted()), "$.id");
+        awaitStatus(run, "FINDINGS_AVAILABLE");
+        assertThat(JsonPath.<String>read(api.get(u("owner"), "/api/v1/runs/" + run).andReturn().getResponse().getContentAsString(), "$.inputs[0].text")).contains("Reproduced on staging");
+    }
+
+    @Test
+    void aRefusedToolCallNamesTheToolAndWhatTheServerSaidSoTheCauseCanBeFound() throws Exception {
+        verified("owner", "owner@example.test:tok-valid");
+        bindTracker();
+        mcp.toolCallError = "403 Forbidden: the token is missing the scope read:jira-work for this site";
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("TRACKER_AUTH_INVALID"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.containsString("refused getJiraIssue"), org.hamcrest.Matchers.containsString("missing the scope read:jira-work"))));
+    }
+
+    @Test
+    void aCredentialWithNoSiteListWorksWhenTheProjectNamesTheSiteAndOtherwiseSaysWhatToSet() throws Exception {
+        verified("owner", "owner@example.test:tok-valid");
+        mcp.sites = "[]";
+        bindTracker();
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("TRACKER_AMBIGUOUS_SITE"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("Set the Jira site for the project")));
+        api.put(u("owner"), "/api/v1/workspaces/" + ws + "/tracker", "{\"providerType\":\"JIRA_MCP\",\"siteHint\":\"https://Acme.atlassian.net/\"}").andExpect(status().isOk());
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isOk());
+        assertThat(mcp.calls().getLast().arguments().path("cloudId").asString()).as("the site address stands in for a cloud id").isEqualTo("acme.atlassian.net");
+    }
+
+    @Test
+    void aSiteListWrappedInAnObjectOrUsingOtherFieldNamesIsStillUnderstood() throws Exception {
+        verified("owner", "owner@example.test:tok-valid");
+        mcp.sites = "{\"resources\":[{\"cloudId\":\"cloud-9\",\"siteUrl\":\"https://acme.atlassian.net\",\"displayName\":\"acme\"}]}";
+        bindTracker();
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isOk());
+        assertThat(mcp.calls().getLast().arguments().path("cloudId").asString()).isEqualTo("cloud-9");
+    }
+
+    @Test
+    void siteListsNestedUnderDataAreFoundAndAnUnderstoodNothingShowsTheReplyStructure() throws Exception {
+        verified("owner", "owner@example.test:tok-valid");
+        bindTracker();
+        mcp.sites = "{\"data\":{\"sites\":[{\"cloudId\":\"c-nested\",\"name\":\"acme\"}]}}";
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isOk());
+        assertThat(mcp.calls().getLast().arguments().path("cloudId").asString()).isEqualTo("c-nested");
+        mcp.sites = "{\"data\":{\"cloudId\":\"c-single\",\"url\":\"https://acme.atlassian.net\"}}";
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isOk());
+        assertThat(mcp.calls().getLast().arguments().path("cloudId").asString()).isEqualTo("c-single");
+        mcp.sites = "{\"data\":{\"note\":\"nothing here\",\"count\":0}}";
+        api.get(u("owner"), "/api/v1/workspaces/" + ws + "/tickets/PBX-7").andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.containsString("data: {note: text, count: number}"), org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("nothing here")))));
+    }
 }

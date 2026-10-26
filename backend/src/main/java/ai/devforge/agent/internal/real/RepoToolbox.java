@@ -97,7 +97,9 @@ final class RepoToolbox {
 
     private String search(RepoTarget repo, JsonNode a) {
         List<String> kws = new ArrayList<>();
-        a.path("keywords").forEach(k -> kws.add(k.asString("")));
+        // models sometimes send one string instead of a list ("keywords": "video role"); meaning is clear, so accept it (real Claude did this on its first run)
+        if (a.path("keywords").isString()) for (String k : a.path("keywords").asString("").split("[\\s,]+")) { if (!k.isBlank()) kws.add(k); }
+        else a.path("keywords").forEach(k -> kws.add(k.asString("")));
         if (kws.isEmpty() || kws.size() > 8) throw DomainException.badRequest("INVALID_KEYWORDS", "Provide between 1 and 8 keywords");
         List<SearchHit> hits = reader.rankFiles(repo.repositoryId(), repo.sha(), kws, null, null, 10);
         if (hits.isEmpty()) return "No files matched those keywords. Try different terms (identifiers, endpoint names, UI labels).";
