@@ -12,5 +12,5 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param maxFileMegabytes largest file a command may write (ulimit -f)
  */
 @ConfigurationProperties("devforge.execution")
-record ExecutionProperties(@DefaultValue({"/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", "/etc/alternatives", "/etc/ssl", "/etc/ca-certificates", "/etc/ld.so.cache"}) List<String> readOnlyMounts,
+record ExecutionProperties(@DefaultValue({"/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", "/etc/alternatives", "/etc/ssl", "/etc/ca-certificates", "/etc/ld.so.cache", "/etc/resolv.conf", "/etc/hosts", "/etc/nsswitch.conf"}) List<String> readOnlyMounts,
                            @DefaultValue List<String> toolchainMounts, @DefaultValue("600") int cpuSeconds, @DefaultValue("4096") int maxProcesses, @DefaultValue("512") int maxFileMegabytes) {}

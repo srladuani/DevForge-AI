@@ -4,6 +4,7 @@ import ai.devforge.identity.CurrentUsers;
 import ai.devforge.platform.DomainException;
 import ai.devforge.workspace.ProjectTypeDefinition;
 import ai.devforge.workspace.ProjectTypes;
+import ai.devforge.workspace.PublishSettings;
 import ai.devforge.workspace.RepoRole;
 import ai.devforge.workspace.TrackerBinding;
 import ai.devforge.workspace.WorkspaceKind;
@@ -82,6 +83,17 @@ class WorkspaceController {
     @DeleteMapping("/workspaces/{id}/tracker")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void clearTracker(@PathVariable UUID id) { service.clearTracker(id, users.require().id()); }
+
+    record PublishSettingsRequest(@Nullable @Size(max = 100) String targetBranch, @NotNull @Size(max = 30) String branchPrefix, boolean draft) {}
+
+    /** How this project's changes are published: pull request target branch, ticket branch prefix, draft or not. */
+    @GetMapping("/workspaces/{id}/publishing")
+    PublishSettings publishing(@PathVariable UUID id) { return service.publishSettingsFor(id, users.require().id()); }
+
+    @PutMapping("/workspaces/{id}/publishing")
+    PublishSettings setPublishing(@PathVariable UUID id, @Valid @RequestBody PublishSettingsRequest r) {
+        return service.setPublishSettings(id, users.require().id(), new PublishSettings(r.targetBranch(), r.branchPrefix(), r.draft()));
+    }
 
     @GetMapping("/workspaces/{id}/members")
     List<WorkspaceService.Member> members(@PathVariable UUID id) { return service.members(id, users.require().id()); }

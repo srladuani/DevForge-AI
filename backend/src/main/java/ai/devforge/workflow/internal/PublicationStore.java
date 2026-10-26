@@ -23,7 +23,7 @@ class PublicationStore {
         if (existing != null && !existing.equals("FAILED") && !existing.equals("PENDING")) return false;
         jdbc.sql("delete from publication where run_id = ? and change_id = ?").params(runId, r.changeId()).update();
         jdbc.sql("insert into publication (id, run_id, change_id, repository_id, repo_name, host_type, remote, branch, base_branch, status, connection_id, plan_hash) values (?,?,?,?,?,?,?,?,?,'PENDING',?,?)")
-            .params(UUID.randomUUID(), runId, r.changeId(), r.repositoryId(), r.repoName(), plan.hostType(), r.owner() + "/" + r.name(), plan.branch(), r.baseBranch(), connectionId, planHash).update();
+            .params(UUID.randomUUID(), runId, r.changeId(), r.repositoryId(), r.repoName(), r.hostType(), r.owner() + "/" + r.name(), plan.branch(), r.baseBranch(), connectionId, planHash).update();
         return true;
     }
 

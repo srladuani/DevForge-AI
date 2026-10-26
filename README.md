@@ -12,7 +12,7 @@ See [`CLAUDE.md`](CLAUDE.md) for the product model and engineering rules, and [`
 | M2 Real investigation | Built: Claude (each user's own key), read-only repo tools, evidence verification. Verified against a scripted provider, **not yet the live API** |
 | M3 Jira via MCP | Built: tickets read with each user's own connection. Verified against a fake MCP server, **not yet Atlassian** |
 | M4 Fix proposal, approved implementation, sandboxed validation | In progress: real proposal/edit/validate pipeline built and tested against a scripted model and a stub test runner; **not yet** live API or real Gradle/Maven builds |
-| M5 Patch export and GitHub publishing | Built: `git am` patch, secret scan, PR text, and push + draft PR with the user's own GitHub token after approval. Verified against a fake GitHub API, **not yet github.com** |
+| M5 Patch export and publishing | Built: `git am` patch, secret scan, PR text, and push + pull request on GitHub or Bitbucket Cloud (target branch such as `develop` per project) with the user's own credential or single sign-on, after approval. Verified against fake hosts, **not yet github.com / bitbucket.org** |
 | M6 Hardening and pilot | In progress: quotas, retention and sweepers, Prometheus metrics, runbook, security review (authorization matrix, dependency audit), OIDC sign-in (**not yet verified against a real provider**). Pilot not started |
 | M2b OpenAI / Gemini | Not started |
 

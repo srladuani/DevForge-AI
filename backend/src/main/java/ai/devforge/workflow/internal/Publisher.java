@@ -109,17 +109,17 @@ class Publisher {
                 } catch (DomainException e) {
                     throw new GitHostException(GitHostException.Kind.AUTH_INVALID, "The connection used for this publication is no longer available");
                 }
-            });
-            RemoteRepo remote = new RemoteRepo(plan.hostType(), repo.owner(), repo.name(), repo.pushUrl());
+            }, s -> connections.replaceSecret(p.connectionId(), run.ownerUserId(), s));
+            RemoteRepo remote = new RemoteRepo(repo.hostType(), repo.owner(), repo.name(), repo.pushUrl());
             String sha;
             try (WorkCopy copy = copies.openWithHistory(run.id() + "-pub-" + repo.repoName(), Path.of(repositories.get(repo.repositoryId()).localPath()), change.baseSha())) {
                 copy.applyPatch(change.patch(), Set.copyOf(change.files()));
                 sha = copy.commit(repo.commitMessage(), owner.displayName().replaceAll("[<>\\r\\n]", ""), owner.email(), Instant.parse(plan.commitTime()));
-                copy.push(remote.pushUrl(), plan.branch(), hosts.gitAuthHeader(plan.hostType(), cred));
+                copy.push(remote.pushUrl(), plan.branch(), hosts.gitAuthHeader(repo.hostType(), cred));
             }
             publications.pushed(p.id(), sha);
             store.appendEvent(run.id(), "BRANCH_PUSHED", Map.of("repository", repo.repoName(), "branch", plan.branch(), "commit", sha));
-            PullRequestRef pr = hosts.findOpenPullRequest(plan.hostType(), cred, remote, plan.branch()).orElseGet(() -> openOrFind(plan, cred, remote, repo));
+            PullRequestRef pr = hosts.findOpenPullRequest(repo.hostType(), cred, remote, plan.branch()).orElseGet(() -> openOrFind(plan, cred, remote, repo));
             publications.prOpen(p.id(), pr.number(), pr.url());
             store.appendEvent(run.id(), "PULL_REQUEST_OPENED", Map.of("repository", repo.repoName(), "number", pr.number(), "url", pr.url()));
             meters.counter("devforge.publications", "outcome", "pr_opened").increment();
@@ -137,10 +137,10 @@ class Publisher {
 
     private PullRequestRef openOrFind(PublishPlan plan, HostCredential cred, RemoteRepo remote, PublishPlan.PlanRepo repo) {
         try {
-            return hosts.openPullRequest(plan.hostType(), cred, remote, plan.branch(), repo.baseBranch(), plan.prTitle(), plan.prBody(), plan.draft());
+            return hosts.openPullRequest(repo.hostType(), cred, remote, plan.branch(), repo.baseBranch(), plan.prTitle(), plan.prBody(), plan.draft());
         } catch (GitHostException e) {
             if (e.kind() == GitHostException.Kind.REJECTED && e.getMessage().toLowerCase().contains("already exists")) {
-                return hosts.findOpenPullRequest(plan.hostType(), cred, remote, plan.branch()).orElseThrow(() -> e);
+                return hosts.findOpenPullRequest(repo.hostType(), cred, remote, plan.branch()).orElseThrow(() -> e);
             }
             throw e;
         }

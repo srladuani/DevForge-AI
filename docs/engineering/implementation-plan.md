@@ -152,6 +152,9 @@ OpenAI and Gemini adapters via `integration-adapter` skill; catalog tiers; capab
 ## M6 — Hardening and pilot · 3-5 wks
 Resource limits/quotas and sweepers, retention jobs, observability dashboards, OIDC, security review (threat-model walk-through, dependency/SAST gates), eval expansion (≥20 cases) and nightly live runs, docs/runbook, pilot with 2-3 engineers on real tickets; collect acceptance metrics from `phase-1-requirements.md`.
 
+### Bitbucket Cloud publishing and Git-host single sign-on (2026-10-26)
+Built on top of the GitHub publisher: a `GitHosts` registry routes by the host each repository's `origin` points to; a **Bitbucket Cloud adapter** (REST API + git over HTTPS; sign-in token, access token or app password) with a verifier; per-project **publishing settings** (target branch such as `develop`, branch prefix, draft); the plan is shown and confirmed **inline on the Changes tab** (still an approval bound to the plan hash, by someone with approval rights); **single sign-on for Bitbucket Cloud and GitHub** using an OAuth app the administrator registers (client id and secret in the server environment), with renewal and non-expiring-token handling. Verified against fake Bitbucket/GitHub APIs, a fake login service and local bare repositories; **not against bitbucket.org or github.com**.
+
 ### M6 status — in progress (2026-10-24): operations and security slices built; pilot not started
 | Item | Result |
 |---|---|

@@ -15,7 +15,7 @@ const VALIDATION: Record<string, { label: string; tone: Tone }> = {
   SIMULATED: { label: 'Not executed (simulated)', tone: 'sim' },
 }
 
-export function ChangesTab({ runId, workspaceId, exportable, canPublish }: { runId: string; workspaceId: string; exportable: boolean; canPublish: boolean }) {
+export function ChangesTab({ runId, workspaceId, exportable, canPublish, canApprove }: { runId: string; workspaceId: string; exportable: boolean; canPublish: boolean; canApprove: boolean }) {
   const changes = useChanges(runId)
   const validations = useValidations(runId)
   if (changes.isPending || validations.isPending) return <Spinner label="Loading changes" />
@@ -29,7 +29,7 @@ export function ChangesTab({ runId, workspaceId, exportable, canPublish }: { run
       <Alert tone="info">
         These are patches for review. Nothing has been applied to any repository on disk, committed, or pushed.
       </Alert>
-      {exportable && <ExportPanel runId={runId} workspaceId={workspaceId} canPublish={canPublish} changes={changes.data.filter((c) => c.attempt === attempts[0])} />}
+      {exportable && <ExportPanel runId={runId} workspaceId={workspaceId} canPublish={canPublish} canApprove={canApprove} changes={changes.data.filter((c) => c.attempt === attempts[0])} />}
       {attempts.map((attempt, idx) => (
         <section key={attempt} aria-label={`Attempt ${attempt}`}>
           <details open={idx === 0} className="space-y-3">

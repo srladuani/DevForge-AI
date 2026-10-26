@@ -248,13 +248,14 @@ describe('Run page', () => {
     expect(screen.queryByText(/git am/)).not.toBeInTheDocument()
   })
 
-  it('lets the owner ask to publish, shows the approver exactly what would be pushed, and then the draft pull request', async () => {
+  it('lets the owner create a pull request: the plan is shown in full, an approver confirms exactly that plan, then the pull request link appears', async () => {
     const r = setup({ run: run({ status: 'AWAITING_REVIEW', mode: 'FIX_AND_PATCH', agent: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', simulated: false }, nextActions: ['accept', 'publish', 'cancel'] }) })
     const change = { id: 'c1', repositoryId: ids.backend, repoName: 'api', baseSha: 'a'.repeat(40), patch: '--- a/X.java\n+++ b/X.java\n@@ -1 +1 @@\n-old\n+new\n', patchHash: 'sha256:1', files: ['X.java'], simulated: false, attempt: 1 }
-    const plan = { runId: r.id, branchName: 'devforge/pbx-7-filter', prDescription: '# T', blocked: false, warnings: [], repositories: [{ changeId: 'c1', repoName: 'api', branch: 'devforge/pbx-7-filter', commitSubject: 'T', files: ['X.java'], patchFileName: 'x.patch', validationStatus: 'PASSED', secrets: [], downloadable: true }] }
+    const plan = { runId: r.id, branchName: 'feature/pbx-7-filter', prDescription: '# T', blocked: false, warnings: [], repositories: [{ changeId: 'c1', repoName: 'api', branch: 'feature/pbx-7-filter', commitSubject: 'T', files: ['X.java'], patchFileName: 'x.patch', validationStatus: 'PASSED', secrets: [], downloadable: true }] }
     let publications: unknown[] = []
     let requested = 0
-    const planSummary = JSON.stringify({ action: 'Push a new branch and open a draft pull request', host: 'GITHUB', branch: 'devforge/pbx-7-filter', title: 'PBX-7: Filter', draft: true, repositories: [{ repository: 'api', remote: 'acme/service', base: 'main', files: ['X.java'] }] })
+    let decided: unknown
+    const planSummary = JSON.stringify({ action: 'Push a new branch and open a pull request', host: 'BITBUCKET_CLOUD', branch: 'feature/pbx-7-filter', title: 'PBX-7: Filter', draft: false, repositories: [{ repository: 'api', host: 'BITBUCKET_CLOUD', remote: 'acme/service', base: 'develop', files: ['X.java'] }] })
     let approvals: ReturnType<typeof approval>[] = []
     server.use(
       http.get(`/api/v1/runs/${r.id}/changes`, () => HttpResponse.json([change])),
@@ -264,32 +265,54 @@ describe('Run page', () => {
       http.post(`/api/v1/runs/${r.id}/publish`, () => {
         requested++
         approvals = [approval({ kind: 'PR', summary: planSummary })]
-        return HttpResponse.json({ approvalId: ids.approval, branch: 'devforge/pbx-7-filter', planHash: 'sha256:plan' }, { status: 202 })
+        return HttpResponse.json({ approvalId: ids.approval, branch: 'feature/pbx-7-filter', planHash: 'sha256:plan' }, { status: 202 })
+      }),
+      http.post(`/api/v1/approvals/${ids.approval}/decision`, async ({ request }) => {
+        decided = await request.json()
+        approvals = []
+        publications = [{ changeId: 'c1', repoName: 'api', status: 'PR_OPEN', remote: 'acme/service', branch: 'feature/pbx-7-filter', baseBranch: 'develop', prNumber: 7, prUrl: 'https://bitbucket.org/acme/service/pull-requests/7' }]
+        return HttpResponse.json(approval({ kind: 'PR', status: 'APPROVED' }))
       }),
     )
     const user = userEvent.setup()
     renderApp(`/runs/${ids.run}?tab=changes`)
-    await user.click(await screen.findByRole('button', { name: 'Ask to publish' }))
+    await user.click(await screen.findByRole('button', { name: 'Create pull request…' }))
     await waitFor(() => expect(requested).toBe(1))
-    expect(await screen.findByText(/Waiting for an approver to approve the publication plan/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Ask to publish' })).not.toBeInTheDocument()
+    // the plan is shown right here, in full, before anything is pushed
+    expect(await screen.findByText(/This will/)).toBeInTheDocument()
+    const section = within(screen.getByRole('region', { name: 'Create a pull request' }))
+    expect(section.getByText('feature/pbx-7-filter')).toBeInTheDocument()
+    expect(section.getByText('acme/service')).toBeInTheDocument()
+    expect(section.getByText('develop')).toBeInTheDocument()
+    expect(section.getByText(/Bitbucket Cloud/)).toBeInTheDocument()
+    expect(section.getByText('X.java')).toBeInTheDocument()
+    expect(section.getByText(/Nothing is merged/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Create pull request…' })).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('tab', { name: /approvals/i }))
-    expect(await screen.findByText(/push a new branch/i)).toBeInTheDocument()
-    expect(screen.getByText('acme/service')).toBeInTheDocument()
-    expect(screen.getByText('X.java')).toBeInTheDocument()
-    expect(screen.getByText(/Nothing is merged/)).toBeInTheDocument()
-
-    approvals = []
-    publications = [{ changeId: 'c1', repoName: 'api', status: 'PR_OPEN', remote: 'acme/service', branch: 'devforge/pbx-7-filter', baseBranch: 'main', prNumber: 7, prUrl: 'https://github.com/acme/service/pull/7' }]
-    await user.click(screen.getByRole('tab', { name: /changes/i }))
+    await user.click(screen.getByRole('button', { name: 'Confirm: push and create the pull request' }))
+    await waitFor(() => expect(decided).toMatchObject({ decision: 'APPROVE', artifactHash: 'sha256:abcdef0123456789abcdef' }))
     const link = await screen.findByRole('link', { name: 'Pull request #7' })
-    expect(link).toHaveAttribute('href', 'https://github.com/acme/service/pull/7')
+    expect(link).toHaveAttribute('href', 'https://bitbucket.org/acme/service/pull-requests/7')
     expect(link).toHaveAttribute('rel', expect.stringContaining('noreferrer'))
-    expect(screen.getByText('Draft pull request open')).toBeInTheDocument()
+    expect(screen.getByText('Pull request open')).toBeInTheDocument()
   })
 
-  it('tells someone who is not the owner that publishing uses the owner’s token, and offers a retry to the owner when it failed', async () => {
+  it('shows someone without approval rights the plan and says an approver must confirm it', async () => {
+    const r = setup({ role: 'OPERATOR', run: run({ status: 'AWAITING_REVIEW', mode: 'FIX_AND_PATCH', agent: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', simulated: false }, nextActions: ['accept', 'publish'] }) })
+    const change = { id: 'c1', repositoryId: ids.backend, repoName: 'api', baseSha: 'a'.repeat(40), patch: '--- a/X.java\n+++ b/X.java\n', patchHash: 'sha256:1', files: ['X.java'], simulated: false, attempt: 1 }
+    const summary = JSON.stringify({ host: 'GITHUB', branch: 'devforge/x', title: 'T', draft: true, repositories: [{ repository: 'api', host: 'GITHUB', remote: 'acme/service', base: 'main', files: ['X.java'] }] })
+    server.use(
+      http.get(`/api/v1/runs/${r.id}/changes`, () => HttpResponse.json([change])),
+      http.get(`/api/v1/runs/${r.id}/export`, () => HttpResponse.json({ runId: r.id, branchName: 'b', prDescription: '#', blocked: false, warnings: [], repositories: [] })),
+      http.get(`/api/v1/runs/${r.id}/publications`, () => HttpResponse.json([])),
+      http.get(`/api/v1/workspaces/${ids.project}/approvals`, () => HttpResponse.json([approval({ kind: 'PR', summary })])),
+    )
+    renderApp(`/runs/${ids.run}?tab=changes`)
+    expect(await screen.findByText(/An approver or admin of this project has to confirm this plan/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirm: push and create the pull request' })).not.toBeInTheDocument()
+  })
+
+  it('tells someone who is not the owner that the pull request uses the owner’s credential, and offers a retry to the owner when it failed', async () => {
     const base = run({ status: 'COMPLETED', mode: 'FIX_AND_PATCH', agent: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', simulated: false }, nextActions: [] })
     const r = setup({ run: base })
     const change = { id: 'c1', repositoryId: ids.backend, repoName: 'api', baseSha: 'a'.repeat(40), patch: '--- a/X.java\n+++ b/X.java\n', patchHash: 'sha256:1', files: ['X.java'], simulated: false, attempt: 1 }
@@ -299,7 +322,7 @@ describe('Run page', () => {
       http.get(`/api/v1/runs/${r.id}/publications`, () => HttpResponse.json([])),
     )
     const first = renderApp(`/runs/${ids.run}?tab=changes`)
-    expect(await screen.findByText(/Only the person who started this run can publish it/)).toBeInTheDocument()
+    expect(await screen.findByText(/Only the person who started this run can create its pull request/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Ask to publish' })).not.toBeInTheDocument()
     first.unmount()
 

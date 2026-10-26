@@ -19,14 +19,35 @@ class GitHubConnectionVerifier implements ConnectionVerifier {
     private final GitHubHost github;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-    GitHubConnectionVerifier(GitHubHost github) { this.github = github; }
+    private final OAuthTokens oauthTokens;
+    private final org.springframework.beans.factory.ObjectProvider<ai.devforge.identity.Connections> connections;
+
+    GitHubConnectionVerifier(GitHubHost github, OAuthTokens oauthTokens, org.springframework.beans.factory.ObjectProvider<ai.devforge.identity.Connections> connections) {
+        this.github = github;
+        this.oauthTokens = oauthTokens;
+        this.connections = connections;
+    }
+
+    @Override
+    public Result verify(java.util.UUID connectionId, java.util.UUID ownerUserId, String secret) {
+        if (!ai.devforge.integration.internal.oauth.OAuthSecret.looksLikeOAuth(secret)) return verify(secret);
+        try {
+            return check(oauthTokens.accessToken(new ai.devforge.integration.HostCredential(connectionId, ownerUserId, () -> secret, s -> connections.getObject().replaceSecret(connectionId, ownerUserId, s))));
+        } catch (ai.devforge.integration.TrackerException e) {
+            return new Result(ConnectionStatus.INVALID, e.getMessage());
+        }
+    }
 
     @Override
     public boolean supports(ConnectionKind kind, String providerType) { return kind == ConnectionKind.GIT_HOST && GitHubHost.TYPE.equals(providerType); }
 
     @Override
     public Result verify(String secret) {
-        HttpRequest req = HttpRequest.newBuilder(URI.create(github.apiBase() + "/user")).timeout(Duration.ofSeconds(20)).header("Authorization", "Bearer " + secret.strip())
+        return check(ai.devforge.integration.internal.oauth.OAuthSecret.looksLikeOAuth(secret) ? ai.devforge.integration.internal.oauth.OAuthSecret.parse(secret).accessToken() : secret.strip());
+    }
+
+    private Result check(String token) {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(github.apiBase() + "/user")).timeout(Duration.ofSeconds(20)).header("Authorization", "Bearer " + token)
             .header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").header("User-Agent", "devforge-ai").GET().build();
         try {
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());

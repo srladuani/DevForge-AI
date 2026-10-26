@@ -6,7 +6,7 @@ import { Input, Select } from '../../components/ui/Field'
 import { errorMessage } from '../../lib/api/client'
 import { titleCase } from '../../lib/format'
 import { useAdapterTypes } from '../connections/api'
-import { useClearTracker, useMembers, useRemoveMember, useSetMember, useSetTracker, useTracker, useUpdateProject, type Policy, type Project, type ProjectRole } from './api'
+import { useClearTracker, useMembers, usePublishSettings, useRemoveMember, useSetMember, useSetPublishSettings, useSetTracker, useTracker, useUpdateProject, type Policy, type Project, type ProjectRole } from './api'
 
 const ROLES: ProjectRole[] = ['VIEWER', 'OPERATOR', 'APPROVER', 'ADMIN']
 const ROLE_HELP: Record<ProjectRole, string> = {
@@ -27,6 +27,7 @@ export function TeamTab({ project }: { project: Project }) {
       <MembersCard projectId={project.id} canManage={canManage} />
       <PolicyCard project={project} canManage={canManage} />
       <TrackerCard projectId={project.id} canManage={canManage} />
+      <PublishingCard projectId={project.id} canManage={canManage} />
     </div>
   )
 }
@@ -219,6 +220,49 @@ function TrackerCard({ projectId, canManage }: { projectId: string; canManage: b
           </>
         )}
       </div>
+    </Card>
+  )
+}
+
+function PublishingCard({ projectId, canManage }: { projectId: string; canManage: boolean }) {
+  const settings = usePublishSettings(projectId)
+  const save = useSetPublishSettings(projectId)
+  const [target, setTarget] = useState<string | null>(null)
+  const [prefix, setPrefix] = useState<string | null>(null)
+  const [draft, setDraft] = useState<boolean | null>(null)
+
+  if (settings.isPending) return <Spinner label="Loading pull request settings" />
+  if (settings.error) return <Alert tone="danger" title="Could not load pull request settings">{errorMessage(settings.error)}</Alert>
+  const current = settings.data
+  const targetValue = target ?? current.targetBranch ?? ''
+  const prefixValue = prefix ?? current.branchPrefix
+  const draftValue = draft ?? current.draft
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    save.mutate({ ...(targetValue.trim() ? { targetBranch: targetValue.trim() } : {}), branchPrefix: prefixValue.trim(), draft: draftValue }, { onSuccess: () => { setTarget(null); setPrefix(null); setDraft(null) } })
+  }
+
+  return (
+    <Card>
+      <CardHeader title="Pull requests" subtitle="Where DevForge sends a finished change" />
+      <form onSubmit={submit} className="space-y-3 p-4 text-sm">
+        <p className="text-muted">
+          After a change is approved, DevForge pushes a new branch named <code className="font-mono text-xs">{prefixValue}&lt;ticket&gt;-&lt;summary&gt;</code> and opens a pull request into the target branch. Nothing is merged.
+        </p>
+        <Input label="Target branch" value={targetValue} onChange={(e) => setTarget(e.target.value)} disabled={!canManage} placeholder="the repository’s default branch" className="font-mono" hint="For example develop. Leave empty to use each repository’s default branch." />
+        <Input label="Branch prefix" value={prefixValue} onChange={(e) => setPrefix(e.target.value)} disabled={!canManage} className="font-mono" hint="For example feature/ or devforge/." />
+        <label className="flex items-center gap-2">
+          <input type="checkbox" checked={draftValue} disabled={!canManage} onChange={(e) => setDraft(e.target.checked)} />
+          Open pull requests as drafts
+        </label>
+        {save.error && <Alert tone="danger" title="Could not save">{errorMessage(save.error)}</Alert>}
+        {canManage && (
+          <Button type="submit" variant="primary" busy={save.isPending}>
+            Save
+          </Button>
+        )}
+      </form>
     </Card>
   )
 }

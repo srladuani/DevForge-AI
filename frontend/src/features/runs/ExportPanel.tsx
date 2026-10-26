@@ -6,14 +6,15 @@ import { Card, CardHeader } from '../../components/ui/Card'
 import { errorMessage } from '../../lib/api/client'
 import { Link } from 'react-router'
 import { ApiError } from '../../lib/api/client'
-import { useApprovals } from '../approvals/api'
+import { useApprovals, useDecide } from '../approvals/api'
+import { hostName, parsePublishSummary } from './publishSummary'
 import { downloadPatch, useExport, usePublications, useRequestPublish, useRetryPublish, type Change, type Publication } from './api'
 
 /**
  * Takes a finished change out of DevForge without any Git host: a patch per repository to apply with `git am`, and a pull-request
  * description to paste. Nothing is pushed or applied for you.
  */
-export function ExportPanel({ runId, workspaceId, changes, canPublish }: { runId: string; workspaceId: string; changes: Change[]; canPublish: boolean }) {
+export function ExportPanel({ runId, workspaceId, changes, canPublish, canApprove }: { runId: string; workspaceId: string; changes: Change[]; canPublish: boolean; canApprove: boolean }) {
   const plan = useExport(runId, true)
   const [copied, setCopied] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
@@ -66,7 +67,7 @@ export function ExportPanel({ runId, workspaceId, changes, canPublish }: { runId
           })}
         </ul>
         {failure && <Alert tone="danger">{failure}</Alert>}
-        <PublishSection runId={runId} workspaceId={workspaceId} canPublish={canPublish} blocked={p.blocked} />
+        <PublishSection runId={runId} workspaceId={workspaceId} canPublish={canPublish} canApprove={canApprove} blocked={p.blocked} />
         <details>
           <summary className="cursor-pointer font-medium">Pull request description</summary>
           <textarea readOnly aria-label="Pull request description" value={p.prDescription} rows={14} className="mt-2 w-full rounded-md border border-border bg-surface p-2 font-mono text-xs" />
@@ -79,20 +80,25 @@ export function ExportPanel({ runId, workspaceId, changes, canPublish }: { runId
   )
 }
 
-/** Pushing a branch and opening a draft pull request on GitHub, with the run owner's own token, after someone approves exactly that plan. */
-function PublishSection({ runId, workspaceId, canPublish, blocked }: { runId: string; workspaceId: string; canPublish: boolean; blocked: boolean }) {
+/**
+ * Pushing a branch and opening a pull request on the Git host, with the run owner's own credential. The owner asks, the plan is shown here in full,
+ * and a person with approval rights confirms exactly that plan (the server binds the confirmation to the plan's hash). Nothing is merged.
+ */
+function PublishSection({ runId, workspaceId, canPublish, canApprove, blocked }: { runId: string; workspaceId: string; canPublish: boolean; canApprove: boolean; blocked: boolean }) {
   const publications = usePublications(runId, true)
   const approvals = useApprovals(workspaceId, runId)
   const request = useRequestPublish(runId)
   const retry = useRetryPublish(runId)
+  const decide = useDecide(runId)
   const list: Publication[] = publications.data ?? []
-  const waiting = (approvals.data ?? []).some((a) => a.kind === 'PR' && a.status === 'PENDING')
+  const pending = (approvals.data ?? []).find((a) => a.kind === 'PR' && a.status === 'PENDING')
+  const plan = pending ? parsePublishSummary(pending.summary) : null
   const err = request.error ?? retry.error
   const code = err instanceof ApiError ? err.code : ''
 
   return (
-    <section aria-label="Publish to GitHub" className="space-y-3 rounded-md border border-border p-3">
-      <h3 className="font-medium">Publish to GitHub</h3>
+    <section aria-label="Create a pull request" className="space-y-3 rounded-md border border-border p-3">
+      <h3 className="font-medium">Create a pull request</h3>
       {list.length > 0 ? (
         <ul className="space-y-2">
           {list.map((p) => (
@@ -100,7 +106,7 @@ function PublishSection({ runId, workspaceId, canPublish, blocked }: { runId: st
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{p.repoName}</span>
                 <span className="font-mono text-xs">{p.remote}</span>
-                <Badge tone={p.status === 'PR_OPEN' ? 'ok' : p.status === 'FAILED' ? 'danger' : 'warn'}>{p.status === 'PR_OPEN' ? 'Draft pull request open' : p.status === 'PUSHED' ? 'Branch pushed' : p.status === 'FAILED' ? 'Failed' : 'Publishing'}</Badge>
+                <Badge tone={p.status === 'PR_OPEN' ? 'ok' : p.status === 'FAILED' ? 'danger' : 'warn'}>{p.status === 'PR_OPEN' ? 'Pull request open' : p.status === 'PUSHED' ? 'Branch pushed' : p.status === 'FAILED' ? 'Failed' : 'Publishing'}</Badge>
                 {p.prUrl && (
                   <a className="underline" href={p.prUrl} target="_blank" rel="noreferrer">
                     Pull request #{p.prNumber}
@@ -111,17 +117,45 @@ function PublishSection({ runId, workspaceId, canPublish, blocked }: { runId: st
             </li>
           ))}
         </ul>
-      ) : waiting ? (
-        <Alert tone="info">Waiting for an approver to approve the publication plan. They can see the branch, repositories and files on the Approvals tab. Nothing has been pushed.</Alert>
+      ) : pending && plan ? (
+        <div className="space-y-3 rounded-md border border-warn bg-surface-2 p-3">
+          <p>
+            This will <strong>push a new branch</strong> <code className="font-mono text-xs">{plan.branch}</code> and open a <strong>{plan.draft ? 'draft ' : ''}pull request</strong>, using the run owner&apos;s own credential. Nothing is merged.
+          </p>
+          <p>
+            <span className="text-muted">Title:</span> {plan.title}
+          </p>
+          <ul className="space-y-2">
+            {plan.repositories.map((r) => (
+              <li key={r.repository}>
+                <strong>{r.repository}</strong> → {hostName(r.host)} <span className="font-mono text-xs">{r.remote}</span> (into <span className="font-mono text-xs">{r.base}</span>)
+                <ul className="mt-1 list-disc pl-5 font-mono text-xs">{r.files.map((f) => <li key={f}>{f}</li>)}</ul>
+              </li>
+            ))}
+          </ul>
+          {decide.error && <Alert tone="danger" title="Could not record the decision">{errorMessage(decide.error)}</Alert>}
+          {canApprove ? (
+            <div className="flex gap-2">
+              <Button variant="primary" busy={decide.isPending} onClick={() => decide.mutate({ approvalId: pending.id, decision: 'APPROVE', artifactHash: pending.artifactHash })}>
+                Confirm: push and create the pull request
+              </Button>
+              <Button variant="danger" disabled={decide.isPending} onClick={() => decide.mutate({ approvalId: pending.id, decision: 'REJECT', artifactHash: pending.artifactHash })}>
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Alert tone="info">An approver or admin of this project has to confirm this plan. Nothing has been pushed.</Alert>
+          )}
+        </div>
       ) : canPublish ? (
         <p className="text-muted">
-          A person with approval rights must approve exactly what will be pushed: a new branch and a <strong>draft</strong> pull request, created with <em>your</em> GitHub token. Nothing is merged.
+          You will see exactly what will be pushed, and confirm it, before anything leaves DevForge. It creates a new branch and a pull request with <em>your</em> credential. Nothing is merged.
         </p>
       ) : (
-        <p className="text-muted">Only the person who started this run can publish it: it uses their own GitHub token.</p>
+        <p className="text-muted">Only the person who started this run can create its pull request: it uses their own credential.</p>
       )}
       {err && (
-        <Alert tone="warn" title="Could not publish">
+        <Alert tone="warn" title="Could not create the pull request">
           {errorMessage(err)}{' '}
           {code === 'NO_USABLE_CONNECTION' && (
             <Link className="underline" to="/connections">
@@ -130,9 +164,9 @@ function PublishSection({ runId, workspaceId, canPublish, blocked }: { runId: st
           )}
         </Alert>
       )}
-      {canPublish && list.length === 0 && !waiting && (
+      {canPublish && list.length === 0 && !pending && (
         <Button variant="primary" busy={request.isPending} disabled={blocked} onClick={() => request.mutate()}>
-          Ask to publish
+          Create pull request…
         </Button>
       )}
       {canPublish && list.some((p) => p.status === 'FAILED') && (

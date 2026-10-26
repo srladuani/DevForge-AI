@@ -10,6 +10,13 @@ public interface GitHosts {
     boolean supports(String hostType);
 
     /**
+     * Finds which configured host a checkout's remote belongs to.
+     *
+     * @throws GitHostException UNSUPPORTED_REMOTE if no configured host matches; no credential may be sent there
+     */
+    RemoteRepo detect(String remoteUrl);
+
+    /**
      * @throws GitHostException UNSUPPORTED_REMOTE if the remote is not on a host configured for this type; no credential may be sent there
      */
     RemoteRepo resolve(String hostType, String remoteUrl);

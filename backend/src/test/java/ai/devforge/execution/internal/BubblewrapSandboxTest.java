@@ -95,4 +95,13 @@ class BubblewrapSandboxTest {
         SandboxResult r = sandbox.run(new SandboxSpec(work, "tail -n +3 /proc/net/dev | wc -l", Duration.ofSeconds(10), true, Map.of(), 1000));
         assertThat(Integer.parseInt(r.output().trim())).as("host interfaces are visible when the network is shared").isGreaterThanOrEqualTo(1);
     }
+
+    @Test
+    void theDefaultMountsGiveTheNetworkStepNameResolutionEvenWhenTheHostLinksItsDnsFileElsewhere() {
+        var defaults = org.springframework.boot.context.properties.bind.Binder.get(new org.springframework.core.env.StandardEnvironment()).bindOrCreate("devforge.execution", ExecutionProperties.class);
+        BubblewrapSandbox withDefaults = new BubblewrapSandbox(defaults);
+        assumeTrue(withDefaults.available());
+        SandboxResult r = withDefaults.run(new SandboxSpec(work, "test -s /etc/resolv.conf && test -s /etc/hosts && test -s /etc/nsswitch.conf && echo DNS-FILES-OK", Duration.ofSeconds(10), true, Map.of(), 1000));
+        assertThat(r.output()).contains("DNS-FILES-OK");
+    }
 }

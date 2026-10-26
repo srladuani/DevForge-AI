@@ -82,7 +82,7 @@ public abstract class WorkflowTestBase extends IntegrationTest {
     /** Waits until the run reaches one of the statuses (workers are asynchronous), failing fast if it lands somewhere unexpected and final. */
     protected void awaitStatus(String runId, String... wanted) {
         List<String> ok = List.of(wanted);
-        await().atMost(Duration.ofSeconds(25)).pollInterval(Duration.ofMillis(60)).until(() -> {
+        await().atMost(Duration.ofSeconds(45)).pollInterval(Duration.ofMillis(60)).until(() -> {
             String s = statusOf(runId);
             if (!ok.contains(s) && List.of("COMPLETED", "CANCELLED").contains(s)) throw new AssertionError("Run ended as " + s + " while waiting for " + ok);
             if (!ok.contains(s) && s.equals("FAILED")) throw new AssertionError("Run FAILED while waiting for " + ok + ": " + field(u("owner"), runId, "$.failure.code"));

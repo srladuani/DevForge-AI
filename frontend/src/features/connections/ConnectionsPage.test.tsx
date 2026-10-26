@@ -130,5 +130,33 @@ describe('My connections', () => {
       expect(screen.getByText(/access_denied/)).toBeInTheDocument()
       await waitFor(() => expect(second.router.state.location.search).toBe(''))
     })
+
+    it('offers single sign-on for a Git host that has it set up, and says what is missing when an administrator has not set it up', async () => {
+      const goTo = vi.spyOn(navigation, 'goTo').mockImplementation(() => undefined)
+      let called = 0
+      server.use(
+        http.post('/api/v1/me/oauth/BITBUCKET_CLOUD/start', () => {
+          called++
+          return HttpResponse.json({ authorizationUrl: 'https://bitbucket.example.test/site/oauth2/authorize?state=s' })
+        }),
+      )
+      const user = userEvent.setup()
+      const first = renderApp('/connections')
+      await user.selectOptions(await screen.findByLabelText('Type'), 'GIT_HOST')
+      await user.selectOptions(screen.getByLabelText('Provider'), 'BITBUCKET_CLOUD')
+      expect(screen.getByText(/instead of creating a token/i)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /sign in with bitbucket cloud/i }))
+      await waitFor(() => expect(goTo).toHaveBeenCalledWith('https://bitbucket.example.test/site/oauth2/authorize?state=s'))
+      expect(called).toBe(1)
+      goTo.mockRestore()
+      first.unmount()
+
+      server.use(http.get('/api/v1/adapter-types', () => HttpResponse.json(adapterTypes.map((a) => (a.type === 'BITBUCKET_CLOUD' ? { ...a, singleSignOn: false } : a)))))
+      renderApp('/connections')
+      await user.selectOptions(await screen.findByLabelText('Type'), 'GIT_HOST')
+      await user.selectOptions(screen.getByLabelText('Provider'), 'BITBUCKET_CLOUD')
+      expect(screen.queryByRole('button', { name: /sign in with bitbucket cloud/i })).not.toBeInTheDocument()
+      expect(screen.getByText(/single sign-on for bitbucket cloud is not set up on this server/i)).toBeInTheDocument()
+    })
   })
 })

@@ -17,6 +17,7 @@ export const projectKeys = {
   repos: (id: string) => ['project', id, 'repos'] as const,
   members: (id: string) => ['project', id, 'members'] as const,
   tracker: (id: string) => ['project', id, 'tracker'] as const,
+  publishing: (id: string) => ['project', id, 'publishing'] as const,
 }
 
 export function useProjectTypes() {
@@ -138,5 +139,19 @@ export function useClearTracker(id: string) {
   return useMutation({
     mutationFn: () => unwrapEmpty(client.DELETE('/api/v1/workspaces/{id}/tracker', { params: { path: { id } } })),
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.tracker(id) }),
+  })
+}
+
+export type PublishSettings = Schemas['PublishSettings']
+
+export function usePublishSettings(id: string) {
+  return useQuery({ queryKey: projectKeys.publishing(id), enabled: id !== '', queryFn: () => unwrap(client.GET('/api/v1/workspaces/{id}/publishing', { params: { path: { id } } })) })
+}
+
+export function useSetPublishSettings(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Schemas['PublishSettingsRequest']) => unwrap(client.PUT('/api/v1/workspaces/{id}/publishing', { params: { path: { id } }, body })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.publishing(id) }),
   })
 }

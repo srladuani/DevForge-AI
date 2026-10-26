@@ -32,26 +32,29 @@ import tools.jackson.databind.json.JsonMapper;
  * pushes, only to the matching git host: a repository whose remote points anywhere else is refused, so a crafted remote cannot collect it.
  */
 @Component
-class GitHubHost implements GitHosts {
+class GitHubHost implements HostAdapter {
     static final String TYPE = "GITHUB";
     static final String DEFAULT_API = "https://api.github.com";
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private static final Pattern HTTPS = Pattern.compile("^https://([^/@]+)/([^/]+)/([^/]+?)(?:\\.git)?/?$");
     private static final Pattern SCP = Pattern.compile("^(?:[\\w.-]+@)?([\\w.-]+):([^/]+)/([^/]+?)(?:\\.git)?/?$");
     private static final Pattern SSH = Pattern.compile("^ssh://(?:[\\w.-]+@)?([\\w.-]+)(?::\\d+)?/([^/]+)/([^/]+?)(?:\\.git)?/?$");
-    private static final Pattern FILE = Pattern.compile("^file://(?:.*/)?([^/]+)/([^/]+?)(?:\\.git)?/?$");
     private static final Pattern NAME = Pattern.compile("[A-Za-z0-9._-]{1,100}");
 
     private final Providers providers;
+    private final OAuthTokens oauthTokens;
     private final boolean allowFileRemotes;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
 
-    GitHubHost(Providers providers, @Value("${devforge.github.allow-file-remotes:false}") boolean allowFileRemotes) {
+    GitHubHost(Providers providers, OAuthTokens oauthTokens, @Value("${devforge.github.allow-file-remotes:false}") boolean allowFileRemotes) {
         this.providers = providers;
+        this.oauthTokens = oauthTokens;
         this.allowFileRemotes = allowFileRemotes;
     }
 
     @Override public boolean supports(String hostType) { return TYPE.equals(hostType); }
+
+    @Override public RemoteRepo detect(String remoteUrl) { return resolve(TYPE, remoteUrl); }
 
     String apiBase() {
         String url = providers.findEnabled(ConnectionKind.GIT_HOST, TYPE).map(ProviderInstanceView::baseUrl).orElse(null);
@@ -60,6 +63,8 @@ class GitHubHost implements GitHosts {
     }
 
     /** The one git host this instance's credentials may be sent to: api.github.com -> github.com; a GHE API address -> its own host. */
+    @Override public String gitHostName() { return gitHost(); }
+
     String gitHost() {
         String host = URI.create(apiBase()).getHost();
         return host == null ? "github.com" : host.toLowerCase(Locale.ROOT).startsWith("api.") ? host.substring(4).toLowerCase(Locale.ROOT) : host.toLowerCase(Locale.ROOT);
@@ -74,7 +79,8 @@ class GitHubHost implements GitHosts {
             if (!host.equals(gitHost())) throw new GitHostException(Kind.UNSUPPORTED_REMOTE, "This repository's remote points to " + host + ", which is not the configured GitHub host (" + gitHost() + "). Your token is never sent anywhere else.");
             return remote(m.group(2), m.group(3), "https://" + host + "/" + m.group(2) + "/" + m.group(3) + ".git");
         }
-        if (allowFileRemotes && (m = FILE.matcher(url)).matches()) return remote(m.group(1), m.group(2), url);
+        FileRemote file = allowFileRemotes ? FileRemote.parse(url) : null;
+        if (file != null && (file.marker() == null || file.marker().equals("github"))) return remote(file.owner(), file.name(), url);
         throw new GitHostException(Kind.UNSUPPORTED_REMOTE, "This repository has no GitHub remote that DevForge can use (found: " + (url.isEmpty() ? "none" : "an unrecognised address") + ").");
     }
 
@@ -85,7 +91,13 @@ class GitHubHost implements GitHosts {
 
     @Override
     public String gitAuthHeader(String hostType, HostCredential c) {
-        return "Authorization: Basic " + Base64.getEncoder().encodeToString(("x-access-token:" + c.secret().get().strip()).getBytes(StandardCharsets.UTF_8));
+        return "Authorization: Basic " + Base64.getEncoder().encodeToString(("x-access-token:" + token(c)).getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** The token as it is to be used: a personal access token as stored, or a sign-in's access token (renewed if it is about to expire). */
+    private String token(HostCredential c) {
+        String raw = c.secret().get().strip();
+        return ai.devforge.integration.internal.oauth.OAuthSecret.looksLikeOAuth(raw) ? oauthTokens.accessToken(c) : raw;
     }
 
     @Override
@@ -117,7 +129,7 @@ class GitHubHost implements GitHosts {
 
     private JsonNode call(HostCredential c, String method, String path, Object body) {
         try {
-            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(apiBase() + path)).timeout(Duration.ofSeconds(30)).header("Authorization", "Bearer " + c.secret().get().strip())
+            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(apiBase() + path)).timeout(Duration.ofSeconds(30)).header("Authorization", "Bearer " + token(c))
                 .header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").header("User-Agent", "devforge-ai");
             if (body != null) b.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)));
             else b.method(method, HttpRequest.BodyPublishers.noBody());

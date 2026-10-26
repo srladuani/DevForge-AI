@@ -32,8 +32,10 @@ class ExportService {
     private final RunService runs;
     private final RunDataStore data;
     private final Users users;
+    private final ai.devforge.workspace.Workspaces workspaces;
 
-    ExportService(RunService runs, RunDataStore data, Users users) {
+    ExportService(RunService runs, RunDataStore data, Users users, ai.devforge.workspace.Workspaces workspaces) {
+        this.workspaces = workspaces;
         this.runs = runs;
         this.data = data;
         this.users = users;
@@ -104,7 +106,7 @@ class ExportService {
         String summary = proposal == null ? run.title() : firstSentence(proposal.summary());
         String subject = (key == null ? "" : key + ": ") + clip(summary, 72);
         String slug = slug(summary);
-        String branch = "devforge/" + (key == null ? runId.toString().substring(0, 8) : key.toLowerCase(Locale.ROOT)) + (slug.isEmpty() ? "" : "-" + slug);
+        String branch = workspaces.publishSettings(run.workspaceId()).branchPrefix() + (key == null ? runId.toString().substring(0, 8) : key.toLowerCase(Locale.ROOT)) + (slug.isEmpty() ? "" : "-" + slug);
         return new Prepared(branch, subject, key, proposal, changes, validations);
     }
 

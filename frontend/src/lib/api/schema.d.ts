@@ -500,6 +500,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{id}/publishing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["publishing"];
+        put: operations["setPublishing"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{id}/repositories": {
         parameters: {
             query?: never;
@@ -629,6 +645,7 @@ export interface components {
             displayName: string;
             /** @enum {string} */
             kind: "AI_PROVIDER" | "GIT_HOST" | "TRACKER";
+            singleSignOn: boolean;
             type: string;
         };
         AddRepositoryRequest: {
@@ -961,6 +978,16 @@ export interface components {
             approvalId: string;
             branch: string;
             planHash: string;
+        };
+        PublishSettings: {
+            branchPrefix: string;
+            draft: boolean;
+            targetBranch?: string;
+        };
+        PublishSettingsRequest: {
+            branchPrefix: string;
+            draft: boolean;
+            targetBranch?: string;
         };
         RepoProfile: {
             buildTools: components["schemas"]["BuildTool"][];
@@ -2016,6 +2043,54 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    publishing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublishSettings"];
+                };
+            };
+        };
+    };
+    setPublishing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublishSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PublishSettings"];
+                };
             };
         };
     };

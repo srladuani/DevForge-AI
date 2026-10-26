@@ -152,7 +152,13 @@ class TrackerOAuthTest extends WorkflowTestBase {
         idp.authorizeHost = null;
         mcp.authorizationServer = "https://auth.evil.example";
         api.post(u("owner"), "/api/v1/me/oauth/JIRA_MCP/start", "{}").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("OAUTH_UNAVAILABLE"));
-        api.post(u("owner"), "/api/v1/me/oauth/GITHUB/start", "{}").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("OAUTH_NOT_SUPPORTED"));
+        api.post(u("owner"), "/api/v1/me/oauth/ANTHROPIC/start", "{}").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("OAUTH_NOT_SUPPORTED"));
+        // an administrator has not registered an OAuth app for GitHub here: single sign-on is off for it, and the sign-in says what is missing
+        api.post(u("owner"), "/api/v1/me/oauth/GITHUB/start", "{}").andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("OAUTH_NOT_CONFIGURED"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("administrator must register")));
+        String adapters = api.get(u("owner"), "/api/v1/adapter-types").andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<Boolean>>read(adapters, "$[?(@.type=='GITHUB')].singleSignOn")).containsExactly(false);
+        assertThat(JsonPath.<List<Boolean>>read(adapters, "$[?(@.type=='JIRA_MCP')].singleSignOn")).containsExactly(true);
     }
 
     @Test

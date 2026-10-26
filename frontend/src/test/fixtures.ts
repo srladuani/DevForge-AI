@@ -117,10 +117,11 @@ export const connection = (over: Partial<S['ConnectionView']> = {}): S['Connecti
 })
 
 export const adapterTypes: S['AdapterType'][] = [
-  { kind: 'AI_PROVIDER', type: 'ANTHROPIC', displayName: 'Anthropic (Claude)', availability: 'SIMULATED', authMethods: ['API_KEY'] },
-  { kind: 'AI_PROVIDER', type: 'OPENAI', displayName: 'OpenAI', availability: 'PLANNED', authMethods: ['API_KEY'] },
-  { kind: 'TRACKER', type: 'JIRA_MCP', displayName: 'Jira (via MCP)', availability: 'REAL', authMethods: ['OAUTH', 'PAT', 'API_KEY'] },
-  { kind: 'GIT_HOST', type: 'GITHUB', displayName: 'GitHub', availability: 'PLANNED', authMethods: ['PAT', 'OAUTH'] },
+  { kind: 'AI_PROVIDER', type: 'ANTHROPIC', displayName: 'Anthropic (Claude)', availability: 'SIMULATED', authMethods: ['API_KEY'], singleSignOn: false },
+  { kind: 'AI_PROVIDER', type: 'OPENAI', displayName: 'OpenAI', availability: 'PLANNED', authMethods: ['API_KEY'], singleSignOn: false },
+  { kind: 'TRACKER', type: 'JIRA_MCP', displayName: 'Jira (via MCP)', availability: 'REAL', authMethods: ['OAUTH', 'PAT', 'API_KEY'], singleSignOn: true },
+  { kind: 'GIT_HOST', type: 'GITHUB', displayName: 'GitHub', availability: 'PLANNED', authMethods: ['PAT', 'OAUTH'], singleSignOn: false },
+  { kind: 'GIT_HOST', type: 'BITBUCKET_CLOUD', displayName: 'Bitbucket Cloud', availability: 'REAL', authMethods: ['PAT', 'OAUTH'], singleSignOn: true },
 ]
 
 export const approval = (over: Partial<S['ApprovalView']> = {}): S['ApprovalView'] => ({

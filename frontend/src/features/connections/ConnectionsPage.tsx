@@ -133,7 +133,8 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
   const [saved, setSaved] = useState(false)
 
   const adapter = forKind.find((a) => a.type === provider) ?? forKind[0]
-  const singleSignOn = adapter !== undefined && adapter.kind === 'TRACKER' && adapter.availability === 'REAL' && adapter.authMethods.includes('OAUTH')
+  const singleSignOn = adapter !== undefined && adapter.singleSignOn
+  const ssoNotSetUp = adapter !== undefined && !adapter.singleSignOn && adapter.availability === 'REAL' && adapter.authMethods.includes('OAUTH')
   const usableAuth = adapter?.authMethods.filter((m) => m !== 'OAUTH') ?? []
 
   function changeKind(k: Kind) {
@@ -196,8 +197,10 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
           <div className="space-y-2 rounded-md border border-border bg-surface-2 p-3 text-sm">
             <p className="font-medium">Sign in with single sign-on</p>
             <p className="text-muted">
-              Use this when your organisation does not allow API tokens (a token then fails with “You don’t have permission to connect via API token”). You sign in on {adapter.displayName}’s own page; DevForge never sees your password and
-              only asks for read access. The tokens are stored encrypted and renewed automatically.
+              {adapter.kind === 'TRACKER'
+                ? `Use this when your organisation does not allow API tokens (a token then fails with “You don’t have permission to connect via API token”). You sign in on ${adapter.displayName}’s own page; DevForge never sees your password and only asks for read access.`
+                : `Use this instead of creating a token. You sign in on ${adapter.displayName}’s own page and approve what DevForge may do (push branches and open pull requests); DevForge never sees your password.`}{' '}
+              The tokens are stored encrypted and renewed automatically.
             </p>
             {signIn.error && <Alert tone="danger" title="Could not start the sign-in">{errorMessage(signIn.error)}</Alert>}
             <Button
@@ -210,7 +213,7 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
           </div>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select label="How you sign in" value={auth} onChange={(e) => setAuth(usableAuth.find((m) => m === e.target.value) ?? 'API_KEY')} hint={singleSignOn ? 'Or use single sign-on above.' : adapter?.authMethods.includes('OAUTH') ? 'Sign-in with OAuth is not available for this provider yet; use a token.' : undefined}>
+          <Select label="How you sign in" value={auth} onChange={(e) => setAuth(usableAuth.find((m) => m === e.target.value) ?? 'API_KEY')} hint={singleSignOn ? 'Or use single sign-on above.' : ssoNotSetUp ? `Single sign-on for ${adapter?.displayName ?? 'this provider'} is not set up on this server (an administrator has to register an OAuth app); use a token.` : adapter?.authMethods.includes('OAUTH') ? 'Sign-in with OAuth is not available for this provider yet; use a token.' : undefined}>
             {usableAuth.map((m) => (
               <option key={m} value={m}>
                 {authLabel(m)}

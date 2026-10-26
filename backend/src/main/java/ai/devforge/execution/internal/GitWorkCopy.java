@@ -87,8 +87,13 @@ final class GitWorkCopy implements WorkCopy {
         var r = GitProcess.runWithInput(root, null, env, "push", "--no-verify", remoteUrl, "HEAD:refs/heads/" + branch);
         if (r.exit() == 0) return;
         String out = r.stdout().toLowerCase(java.util.Locale.ROOT);
-        if (out.contains("authentication") || out.contains("403") || out.contains("401") || out.contains("could not read username") || out.contains("permission")) throw new PushRejected("AUTH", "The Git host refused the credential or the account may not push to this repository");
-        if (out.contains("rejected") || out.contains("non-fast-forward") || out.contains("fetch first")) throw new PushRejected("REJECTED", "The branch already exists on the remote with different history");
+        // history problems first: they are specific, and text such as a temporary directory name can contain any digits
+        if (out.contains("[rejected]") || out.contains("non-fast-forward") || out.contains("fetch first") || out.contains("[remote rejected]") && out.contains("protected")) {
+            throw new PushRejected("REJECTED", "The branch already exists on the remote with different history");
+        }
+        if (java.util.regex.Pattern.compile("authentication failed|could not read username|permission denied|access denied|returned error: 40[13]|http/[0-9.]+ 40[13]|the requested url returned error: 40[13]").matcher(out).find()) {
+            throw new PushRejected("AUTH", "The Git host refused the credential or the account may not push to this repository");
+        }
         throw new PushRejected("UNREACHABLE", "The push did not complete");
     }
 

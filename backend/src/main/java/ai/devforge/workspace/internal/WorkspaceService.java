@@ -9,6 +9,7 @@ import ai.devforge.repository.RepositoryView;
 import ai.devforge.workspace.ProjectTypeDefinition;
 import ai.devforge.workspace.ProjectTypes;
 import ai.devforge.workspace.RepoRole;
+import ai.devforge.workspace.PublishSettings;
 import ai.devforge.workspace.TrackerBinding;
 import ai.devforge.workspace.WorkspaceAccess;
 import ai.devforge.workspace.WorkspaceKind;
@@ -104,6 +105,31 @@ class WorkspaceService implements Workspaces, WorkspaceAccess {
     public java.util.Optional<TrackerBinding> tracker(UUID id) {
         return jdbc.sql("select provider_type, site_hint from workspace_tracker where workspace_id = ?").param(id)
             .query((rs, i) -> new TrackerBinding(rs.getString(1), rs.getString(2))).optional();
+    }
+
+    @Override
+    public PublishSettings publishSettings(UUID id) {
+        return jdbc.sql("select target_branch, branch_prefix, draft from workspace_publish where workspace_id = ?").param(id)
+            .query((rs, i) -> new PublishSettings(rs.getString(1), rs.getString(2), rs.getBoolean(3))).optional().orElse(PublishSettings.defaults());
+    }
+
+    PublishSettings publishSettingsFor(UUID id, UUID userId) {
+        require(id, userId, Permission.VIEW);
+        return publishSettings(id);
+    }
+
+    @Transactional
+    PublishSettings setPublishSettings(UUID id, UUID userId, PublishSettings s) {
+        require(id, userId, Permission.MANAGE);
+        PublishSettings clean = new PublishSettings(s.targetBranch() == null || s.targetBranch().isBlank() ? null : s.targetBranch().strip(), s.branchPrefix() == null ? PublishSettings.DEFAULT_PREFIX : s.branchPrefix().strip(), s.draft());
+        String problem = clean.problem();
+        if (problem != null) throw DomainException.badRequest("INVALID_PUBLISH_SETTINGS", problem);
+        jdbc.sql("""
+                insert into workspace_publish (workspace_id, target_branch, branch_prefix, draft, updated_by) values (?,?,?,?,?)
+                on conflict (workspace_id) do update set target_branch = excluded.target_branch, branch_prefix = excluded.branch_prefix, draft = excluded.draft, updated_by = excluded.updated_by, updated_at = now()""")
+            .params(id, clean.targetBranch(), clean.branchPrefix(), clean.draft(), userId).update();
+        audit.record(userId.toString(), "PUBLISH_SETTINGS_SET", "workspace", id.toString(), (clean.targetBranch() == null ? "default branch" : clean.targetBranch()) + ", prefix " + clean.branchPrefix() + ", draft " + clean.draft());
+        return clean;
     }
 
     java.util.Optional<TrackerBinding> trackerFor(UUID id, UUID userId) {

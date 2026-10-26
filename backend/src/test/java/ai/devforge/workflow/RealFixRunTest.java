@@ -36,7 +36,7 @@ import tools.jackson.databind.json.JsonMapper;
  * runner is a stub (the sandbox and real build tools are covered by their own tests), but the work copies, path rules, approval gate, patches
  * and the workflow are the production ones. It proves our side; it does not prove how Claude behaves.
  */
-@TestPropertySource(properties = {"devforge.agent.mode=real", "devforge.workflow.queue-name=real-fix", "devforge.agent.max-tool-calls=6", "devforge.workflow.retry-backoff-millis=10", "devforge.github.allow-file-remotes=true"})
+@TestPropertySource(properties = {"devforge.agent.mode=real", "devforge.workflow.queue-name=real-fix", "devforge.agent.max-tool-calls=6", "devforge.workflow.retry-backoff-millis=10", "devforge.github.allow-file-remotes=true", "devforge.bitbucket.allow-file-remotes=true"})
 class RealFixRunTest extends WorkflowTestBase {
     private static final String ADMIN = "admin@example.test";
     private static final String BO = "src/main/java/com/acme/video/TrainingVideoBO.java";
@@ -66,6 +66,8 @@ class RealFixRunTest extends WorkflowTestBase {
     @Autowired StubValidator validator;
     private final ScriptedAnthropicServer server = new ScriptedAnthropicServer();
     private final ai.devforge.testsupport.FakeGitHubServer gh = new ai.devforge.testsupport.FakeGitHubServer();
+    private final ai.devforge.testsupport.FakeBitbucketServer bb = new ai.devforge.testsupport.FakeBitbucketServer();
+    private String bitbucketInstanceId;
     private String providerId;
     private String githubInstanceId;
 
@@ -78,6 +80,8 @@ class RealFixRunTest extends WorkflowTestBase {
         String hosts = api.get(ADMIN, "/api/v1/admin/provider-instances?kind=GIT_HOST").andReturn().getResponse().getContentAsString();
         githubInstanceId = JsonPath.<List<String>>read(hosts, "$[?(@.adapterType=='GITHUB')].id").getFirst();
         api.patch(ADMIN, "/api/v1/admin/provider-instances/" + githubInstanceId, "{\"baseUrl\":\"" + gh.url() + "\"}").andExpect(status().isOk());
+        bitbucketInstanceId = JsonPath.<List<String>>read(hosts, "$[?(@.adapterType=='BITBUCKET_CLOUD')].id").getFirst();
+        api.patch(ADMIN, "/api/v1/admin/provider-instances/" + bitbucketInstanceId, "{\"baseUrl\":\"" + bb.url() + "\"}").andExpect(status().isOk());
         validator.script.clear();
         validator.boAsSeen.clear();
         validator.requests.clear();
@@ -87,6 +91,8 @@ class RealFixRunTest extends WorkflowTestBase {
     void restore() throws Exception {
         if (providerId != null) api.patch(ADMIN, "/api/v1/admin/provider-instances/" + providerId, "{\"baseUrl\":\"\"}").andExpect(status().isOk());
         if (githubInstanceId != null) api.patch(ADMIN, "/api/v1/admin/provider-instances/" + githubInstanceId, "{\"baseUrl\":\"\"}").andExpect(status().isOk());
+        if (bitbucketInstanceId != null) api.patch(ADMIN, "/api/v1/admin/provider-instances/" + bitbucketInstanceId, "{\"baseUrl\":\"\"}").andExpect(status().isOk());
+        bb.close();
         gh.close();
         server.close();
     }
@@ -409,5 +415,80 @@ class RealFixRunTest extends WorkflowTestBase {
         assertThat(gh.pullCreations()).as("the pull request that already existed was reused").hasSize(1);
         assertThat(FixtureRepos.git(remote, "branch", "--list").lines().filter(l -> !l.isBlank()).count()).isEqualTo(1);
         assertThat(FixtureRepos.git(remote, "branch", "--list")).contains(branch);
+    }
+
+    // ---- publishing to Bitbucket Cloud
+
+    private void bitbucketCredential(String who, String secret) throws Exception {
+        String id = Api.json(api.post(u(who), "/api/v1/me/connections", "{\"kind\":\"GIT_HOST\",\"providerType\":\"BITBUCKET_CLOUD\",\"authMethod\":\"PAT\",\"label\":\"bb\",\"secret\":\"" + secret + "\"}").andExpect(status().isCreated()), "$.id");
+        api.post(u(who), "/api/v1/me/connections/" + id + "/verify", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("VALID"));
+    }
+
+    private void setUpBitbucketRemote() {
+        remote = tmp.resolve("bitbucket").resolve("acme").resolve("service.git");
+        FixtureRepos.git(tmp, "init", "-q", "--bare", remote.toString());
+        FixtureRepos.git(tmp.resolve("backend"), "remote", "add", "origin", remote.toUri().toString().replaceAll("/$", ""));
+    }
+
+    private String bitbucketReady(String secret) throws Exception {
+        setUpBitbucketRemote();
+        bitbucketCredential("owner", secret);
+        return runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
+    }
+
+    private String publishAndApprove(String run) throws Exception {
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isAccepted());
+        decide(u("approver"), pendingApprovalId(run), "APPROVE", pendingApprovalHash(run)).andExpect(status().isOk());
+        awaitPublication(run, "PR_OPEN");
+        return Api.json(api.get(u("owner"), "/api/v1/runs/" + run + "/publications"), "$[0].branch");
+    }
+
+    @Test
+    void aProjectPublishesToBitbucketIntoItsConfiguredTargetBranchWithItsOwnBranchPrefixAndPullRequestKind() throws Exception {
+        api.put(u("owner"), "/api/v1/workspaces/" + ws + "/publishing", "{\"targetBranch\":\"develop\",\"branchPrefix\":\"feature/\",\"draft\":false}").andExpect(status().isOk());
+        String run = bitbucketReady(bb.acceptedBearer);
+        String branch = publishAndApprove(run);
+        assertThat(branch).startsWith("feature/" + run.substring(0, 8) + "-filter-the-videos");
+        var pr = bb.pullCreations().getFirst();
+        assertThat(pr.body()).contains("\"destination\":{\"branch\":{\"name\":\"develop\"}}").contains("\"name\":\"" + branch + "\"").contains("\"draft\":false").contains("How it was checked");
+        assertThat(pr.authorization()).isEqualTo("Bearer " + bb.acceptedBearer);
+        api.get(u("viewer"), "/api/v1/runs/" + run + "/publications").andExpect(jsonPath("$[0].prUrl").value(org.hamcrest.Matchers.containsString("pull-requests/11"))).andExpect(jsonPath("$[0].baseBranch").value("develop"));
+        assertThat(FixtureRepos.git(remote, "branch", "--list")).contains(branch);
+        assertThat(gh.requests()).as("a Bitbucket repository never touches GitHub").isEmpty();
+        api.get(u("approver"), "/api/v1/workspaces/" + ws + "/approvals?runId=" + run).andExpect(jsonPath("$[0].summary").value(org.hamcrest.Matchers.allOf(org.hamcrest.Matchers.containsString("develop"), org.hamcrest.Matchers.containsString("BITBUCKET_CLOUD"))));
+    }
+
+    @Test
+    void withoutATargetBranchTheRepositorysMainBranchIsUsedAndAnAppPasswordGoesAsBasic() throws Exception {
+        bb.mainBranch = "trunk";
+        String run = bitbucketReady(bb.acceptedBasic);
+        publishAndApprove(run);
+        var pr = bb.pullCreations().getFirst();
+        assertThat(pr.body()).contains("\"destination\":{\"branch\":{\"name\":\"trunk\"}}").contains("\"draft\":true");
+        assertThat(pr.authorization()).startsWith("Basic ");
+    }
+
+    @Test
+    void aRejectedPullRequestShowsBitbucketsReasonAndTheTokenIsNeverInEvents() throws Exception {
+        String run = bitbucketReady(bb.acceptedBearer);
+        bb.pullCreateStatus = 400;
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isAccepted());
+        decide(u("approver"), pendingApprovalId(run), "APPROVE", pendingApprovalHash(run)).andExpect(status().isOk());
+        awaitPublication(run, "FAILED");
+        api.get(u("owner"), "/api/v1/runs/" + run + "/publications").andExpect(jsonPath("$[0].failureCode").value("HOST_REJECTED")).andExpect(jsonPath("$[0].failureMessage").value(org.hamcrest.Matchers.containsString("Pull request could not be created")));
+        String events = api.get(u("owner"), "/api/v1/runs/" + run + "/events").andReturn().getResponse().getContentAsString();
+        assertThat(events).doesNotContain(bb.acceptedBearer);
+        bb.pullCreateStatus = 200;
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish/retry", null).andExpect(status().isOk()).andExpect(jsonPath("$[0].status").value("PR_OPEN"));
+    }
+
+    @Test
+    void publishSettingsAreValidatedHaveDefaultsAndOnlyAdminsChangeThem() throws Exception {
+        api.get(u("viewer"), "/api/v1/workspaces/" + ws + "/publishing").andExpect(status().isOk()).andExpect(jsonPath("$.branchPrefix").value("devforge/")).andExpect(jsonPath("$.draft").value(true)).andExpect(jsonPath("$.targetBranch").doesNotExist());
+        api.put(u("operator"), "/api/v1/workspaces/" + ws + "/publishing", "{\"targetBranch\":\"develop\",\"branchPrefix\":\"x/\",\"draft\":true}").andExpect(status().isForbidden());
+        api.put(u("owner"), "/api/v1/workspaces/" + ws + "/publishing", "{\"targetBranch\":\"../etc\",\"branchPrefix\":\"x/\",\"draft\":true}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_PUBLISH_SETTINGS"));
+        api.put(u("owner"), "/api/v1/workspaces/" + ws + "/publishing", "{\"targetBranch\":\"develop\",\"branchPrefix\":\"-bad\",\"draft\":true}").andExpect(status().isBadRequest());
+        api.put(u("owner"), "/api/v1/workspaces/" + ws + "/publishing", "{\"targetBranch\":\"\",\"branchPrefix\":\"feature/\",\"draft\":false}").andExpect(status().isOk()).andExpect(jsonPath("$.targetBranch").doesNotExist());
+        api.get(u("outsider"), "/api/v1/workspaces/" + ws + "/publishing").andExpect(status().isNotFound());
     }
 }

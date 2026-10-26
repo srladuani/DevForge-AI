@@ -180,4 +180,19 @@ class WorkCopyTest {
         assertThat(FixtureRepos.git(source, "status", "--porcelain")).isEqualTo(before);
         assertThat(FixtureRepos.git(source, "branch", "--list").contains("devforge")).isFalse();
     }
+
+    @Test
+    void aRejectedPushIsNotMistakenForARefusedCredentialWhateverDigitsThePathContains() throws IOException {
+        Path bare = tmp.resolve("junit4013-4011").resolve("remote.git");
+        java.nio.file.Files.createDirectories(bare.getParent());
+        FixtureRepos.git(tmp, "init", "-q", "--bare", bare.toString());
+        copy.edit(BO, "videosFor", "videosForRole", Set.of());
+        copy.commit("m", "A", "a@example.test", java.time.Instant.parse("2026-10-23T10:00:00Z"));
+        copy.push(bare.toUri().toString(), "devforge/p", null);
+        try (WorkCopy other = new ScratchCopies(tmp.resolve("work").toString()).open("other2", source, sha)) {
+            other.edit(BO, "videosFor", "elsewhere", Set.of());
+            other.commit("m2", "B", "b@example.test", java.time.Instant.parse("2026-10-23T11:00:00Z"));
+            assertThatThrownBy(() -> other.push(bare.toUri().toString(), "devforge/p", null)).isInstanceOfSatisfying(WorkCopy.PushRejected.class, e -> assertThat(e.code()).isEqualTo("REJECTED"));
+        }
+    }
 }

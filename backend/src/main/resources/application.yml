@@ -48,6 +48,16 @@ devforge:
     # The address people reach this application at. After signing in to a provider (single sign-on for Jira), the browser returns to
     # <redirect-base>/api/v1/oauth/callback, which the provider must accept. Behind a reverse proxy set it to the public address.
     redirect-base: ${DEVFORGE_OAUTH_REDIRECT_BASE:http://localhost:8080}
+    # Providers without automatic registration: an administrator registers an OAuth app once (callback address = <redirect-base>/api/v1/oauth/callback)
+    # and gives its client id and secret here (from the environment). Empty = single sign-on for that provider is off.
+    providers:
+      bitbucket-cloud:
+        client-id: ${DEVFORGE_OAUTH_BITBUCKET_CLIENT_ID:}
+        client-secret: ${DEVFORGE_OAUTH_BITBUCKET_CLIENT_SECRET:}
+      github:
+        client-id: ${DEVFORGE_OAUTH_GITHUB_CLIENT_ID:}
+        client-secret: ${DEVFORGE_OAUTH_GITHUB_CLIENT_SECRET:}
+        scopes: repo
   workflow:
     # finished runs older than this many days are deleted with everything they produced (0 keeps them)
     retention-days: ${DEVFORGE_RETENTION_DAYS:0}
@@ -74,3 +84,4 @@ devforge:
       - { kind: AI_PROVIDER, adapter-type: GEMINI, display-name: "Gemini (Google)" }
       - { kind: TRACKER, adapter-type: JIRA_MCP, display-name: "Jira (via MCP)" }
       - { kind: GIT_HOST, adapter-type: GITHUB, display-name: "GitHub" }
+      - { kind: GIT_HOST, adapter-type: BITBUCKET_CLOUD, display-name: "Bitbucket Cloud" }

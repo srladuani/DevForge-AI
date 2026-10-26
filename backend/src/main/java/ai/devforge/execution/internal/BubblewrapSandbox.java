@@ -126,12 +126,17 @@ class BubblewrapSandbox implements Sandbox {
     private static void env(List<String> cmd, String k, String v) { cmd.addAll(List.of("--setenv", k, v)); }
 
     /** Symlinked system directories (/bin -> usr/bin) are recreated as links; real ones are bound read-only. Missing paths are skipped. */
-    private static void mount(List<String> cmd, String path, Set<String> mounted) {
+    private void mount(List<String> cmd, String path, Set<String> mounted) {
         Path p = Path.of(path);
         if (!mounted.add(path) || !Files.exists(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return;
         try {
-            if (Files.isSymbolicLink(p)) cmd.addAll(List.of("--symlink", Files.readSymbolicLink(p).toString(), path));
-            else cmd.addAll(List.of("--ro-bind", path, path));
+            if (Files.isSymbolicLink(p)) {
+                Path real = p.toRealPath();
+                // a link into another mounted tree (/bin -> usr/bin) is recreated as a link; one that points elsewhere (/etc/resolv.conf -> /run/systemd/...) would dangle, so what it points to is bound at its place
+                boolean insideMounted = props.readOnlyMounts().stream().anyMatch(m -> !m.equals(path) && real.startsWith(m)) || props.toolchainMounts().stream().anyMatch(real::startsWith);
+                if (insideMounted) cmd.addAll(List.of("--symlink", Files.readSymbolicLink(p).toString(), path));
+                else cmd.addAll(List.of("--ro-bind", real.toString(), path));
+            } else cmd.addAll(List.of("--ro-bind", path, path));
         } catch (IOException e) {
             // an unreadable mount point is simply absent inside the sandbox
         }

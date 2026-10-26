@@ -24,6 +24,20 @@ Some Atlassian organisations do not allow API tokens on the MCP server (an API-t
 - Addresses learned from Atlassian's metadata must be https and in the same organisation as the MCP server, or the sign-in is refused before anything is sent.
 - **Not verified against Atlassian:** the flow is tested against a fake login service; whether Atlassian accepts a localhost redirect address for a self-registered client is unconfirmed. If it refuses, ask the Atlassian organisation admin to allow the redirect address, or to enable API tokens (Atlassian Administration, Rovo MCP server settings).
 
+## Publishing to a Git host (GitHub, Bitbucket Cloud)
+The run's owner opens the **Changes** tab and presses **Create pull request…**. The plan appears in full (host, repository, branch, target branch, files); a person with approval rights presses **Confirm: push and create the pull request**, which approves exactly that plan. Then DevForge makes one commit on the real base commit, pushes a new branch (never forced) and opens the pull request with the owner's own credential. Nothing is merged.
+- **Per project** (People & policy → *Pull requests*, admin): the **target branch** (for example `develop`; empty = each repository's default branch on the host), the **branch prefix** (`devforge/` by default; for example `feature/`) and whether pull requests open as **drafts**.
+- **The host is found from each checkout's `origin` remote** (https or ssh form), so one project may mix GitHub and Bitbucket repositories; the owner needs a verified connection for each host used. A remote on any other host is refused and no credential is sent there.
+- **Bitbucket Cloud credentials:** sign in with single sign-on (below), or add a *repository/workspace access token* or an *app password* (`username:app-password`) under My connections. Verify uses `GET /user`; a repository access token has no account scope and is reported as accepted-but-unconfirmed (it is exercised on the first publication). **Not verified against bitbucket.org**; whether the API accepts the `draft` field on pull request creation is unconfirmed.
+- Repositories whose base commit has local commits that were never pushed will push those commits too.
+
+## Single sign-on for Git hosts (OAuth app registered by an administrator)
+Bitbucket Cloud and GitHub have no automatic client registration, so an administrator registers an OAuth app once and gives DevForge its client id and secret (server environment). People then press **Sign in with Bitbucket Cloud / GitHub** under My connections; their own tokens are stored encrypted in their own connection and renewed automatically.
+- **Callback address to register:** `<DEVFORGE_OAUTH_REDIRECT_BASE>/api/v1/oauth/callback` (default `http://localhost:8080/api/v1/oauth/callback`).
+- **Bitbucket Cloud:** Workspace settings → *OAuth consumers* → *Add consumer*; set the callback URL; make it a private consumer; permissions *Account: Read*, *Repositories: Read and Write*, *Pull requests: Read and Write*. Set `DEVFORGE_OAUTH_BITBUCKET_CLIENT_ID` and `DEVFORGE_OAUTH_BITBUCKET_CLIENT_SECRET` (the consumer's Key and Secret).
+- **GitHub:** Settings → Developer settings → *OAuth Apps* → *New OAuth App*; set the callback URL. Set `DEVFORGE_OAUTH_GITHUB_CLIENT_ID` and `DEVFORGE_OAUTH_GITHUB_CLIENT_SECRET`. (Requests scope `repo` and uses PKCE; GitHub Enterprise: override `devforge.oauth.providers.github.authorize-url` and `token-url`.)
+- Until the client id and secret are set, the button is replaced by a note that single sign-on is not set up, and personal/access tokens keep working. **Tested against a fake login service; not verified against Bitbucket or GitHub** (the menu paths above are from memory of their current screens).
+
 ## Configuration that matters (all `devforge.*`, env-overridable)
 | Setting | Default | Meaning |
 |---|---|---|

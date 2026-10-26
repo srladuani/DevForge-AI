@@ -27,13 +27,13 @@ class SandboxValidator implements Validator {
     private static final Duration WARM_TIMEOUT = Duration.ofMinutes(15);
     private static final Duration TEST_TIMEOUT = Duration.ofMinutes(20);
     /** Gradle only caches what a build resolved, so ask it to resolve every configuration (compile classpaths alone leave test runtime out). */
-    private static final String GRADLE_RESOLVE_ALL = "allprojects { tasks.register('devforgeResolveAll') { doLast { configurations.matching { it.canBeResolved }.each { try { it.resolve() } catch (Exception e) { println 'unresolved: ' + it.name } } } } }\n";
+    private static final String GRADLE_RESOLVE_ALL = "allprojects { p -> p.tasks.register('devforgeResolveAll') { doLast { p.configurations.matching { it.canBeResolved }.each { c -> try { c.resolve() } catch (Exception e) { println 'unresolved: ' + c.name + ' - ' + String.valueOf(e.message).readLines().take(3).join(' ').take(300) } } } } }\n";
 
     private final Sandbox sandbox;
 
     SandboxValidator(Sandbox sandbox) { this.sandbox = sandbox; }
 
-    private record Recipe(String warm, String test, Map<String, String> env) {}
+    record Recipe(String warm, String test, Map<String, String> env) {}
 
     @Override
     public ValidationReport validate(WorkCopy copy, ValidationRequest req, Path cacheDir, BooleanSupplier cancelled) {
@@ -63,11 +63,11 @@ class SandboxValidator implements Validator {
         }
     }
 
-    private static Recipe recipe(ValidationRequest r) {
+    static Recipe recipe(ValidationRequest r) {
         String custom = r.testCommand();
         return switch (r.tool()) {
-            case "gradle" -> new Recipe("(./gradlew || gradle) --no-daemon -q --init-script /cache/resolve-all.gradle devforgeResolveAll",
-                (custom != null && custom.startsWith("./gradlew") ? custom : "./gradlew test") + " --offline --no-daemon", Map.of("GRADLE_USER_HOME", "/cache/gradle"));
+            case "gradle" -> new Recipe("if [ -f ./gradlew ]; then sh ./gradlew --no-daemon --no-configuration-cache -q --init-script /cache/resolve-all.gradle devforgeResolveAll; else gradle --no-daemon --no-configuration-cache -q --init-script /cache/resolve-all.gradle devforgeResolveAll; fi",
+                (custom != null && custom.startsWith("./gradlew") ? custom : "./gradlew test") + " --offline --no-daemon --no-configuration-cache", Map.of("GRADLE_USER_HOME", "/cache/gradle"));
             case "maven" -> new Recipe("./mvnw -B -q dependency:go-offline -Dmaven.repo.local=/cache/m2", "./mvnw -B -o test -Dmaven.repo.local=/cache/m2", Map.of());
             case "npm" -> new Recipe("npm ci --ignore-scripts --no-audit --no-fund", custom != null ? custom : "npm test", Map.of("npm_config_cache", "/cache/npm", "CI", "true"));
             case "yarn" -> new Recipe("yarn install --frozen-lockfile --ignore-scripts", custom != null ? custom : "yarn test", Map.of("YARN_CACHE_FOLDER", "/cache/yarn", "CI", "true"));

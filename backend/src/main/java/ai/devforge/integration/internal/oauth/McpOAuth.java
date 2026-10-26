@@ -130,9 +130,34 @@ public class McpOAuth {
     private static Tokens tokens(JsonNode r, String previousRefresh) {
         String access = r.path("access_token").asString("");
         if (access.isBlank()) throw new OAuthException("The login service did not return an access token");
-        long lifetime = r.path("expires_in").asLong(3600);
-        return new Tokens(access, r.path("refresh_token").asString(previousRefresh), java.time.Instant.now().plusSeconds(Math.max(lifetime, 1)).getEpochSecond());
+        String refresh = r.path("refresh_token").asString(previousRefresh);
+        // a provider that sends neither a lifetime nor a refresh token issues tokens that do not expire (GitHub OAuth apps by default)
+        long expiresAt = r.has("expires_in") ? java.time.Instant.now().plusSeconds(Math.max(r.path("expires_in").asLong(3600), 1)).getEpochSecond() : refresh.isBlank() ? OAuthSecret.NEVER : java.time.Instant.now().plusSeconds(3600).getEpochSecond();
+        return new Tokens(access, refresh, expiresAt);
     }
+
+    /** Code exchange for a provider with a pre-registered client: the client authenticates with its secret (HTTP Basic, or in the body). */
+    public Tokens exchangeWithClient(String tokenEndpoint, String clientId, String clientSecret, boolean basicAuth, String code, String redirectUri, @org.jspecify.annotations.Nullable String verifier) {
+        checkTokenEndpoint(tokenEndpoint);
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("grant_type", "authorization_code");
+        form.put("code", code);
+        form.put("redirect_uri", redirectUri);
+        if (verifier != null && !verifier.isBlank()) form.put("code_verifier", verifier);
+        if (!basicAuth) { form.put("client_id", clientId); form.put("client_secret", clientSecret); }
+        return tokens(postForm(tokenEndpoint, form, basicAuth ? basic(clientId, clientSecret) : null), "");
+    }
+
+    public Tokens refreshWithClient(String tokenEndpoint, String clientId, String clientSecret, boolean basicAuth, String refreshToken) {
+        checkTokenEndpoint(tokenEndpoint);
+        Map<String, String> form = new LinkedHashMap<>();
+        form.put("grant_type", "refresh_token");
+        form.put("refresh_token", refreshToken);
+        if (!basicAuth) { form.put("client_id", clientId); form.put("client_secret", clientSecret); }
+        return tokens(postForm(tokenEndpoint, form, basicAuth ? basic(clientId, clientSecret) : null), refreshToken);
+    }
+
+    private static String basic(String id, String secret) { return "Basic " + Base64.getEncoder().encodeToString((id + ":" + secret).getBytes(StandardCharsets.UTF_8)); }
 
     // ---- addresses and HTTP
 
@@ -173,10 +198,13 @@ public class McpOAuth {
             .POST(HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build());
     }
 
-    private JsonNode postForm(String url, Map<String, String> form) {
+    private JsonNode postForm(String url, Map<String, String> form) { return postForm(url, form, null); }
+
+    private JsonNode postForm(String url, Map<String, String> form, @org.jspecify.annotations.Nullable String authorization) {
         String body = form.entrySet().stream().map(e -> enc(e.getKey()) + "=" + enc(e.getValue())).collect(Collectors.joining("&"));
-        return send(HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15)).header("Content-Type", "application/x-www-form-urlencoded").header("Accept", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(body)).build());
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(15)).header("Content-Type", "application/x-www-form-urlencoded").header("Accept", "application/json");
+        if (authorization != null) b.header("Authorization", authorization);
+        return send(b.POST(HttpRequest.BodyPublishers.ofString(body)).build());
     }
 
     private JsonNode send(HttpRequest req) {

@@ -38,11 +38,14 @@
             "enum" : [ "AI_PROVIDER", "GIT_HOST", "TRACKER" ],
             "type" : "string"
           },
+          "singleSignOn" : {
+            "type" : "boolean"
+          },
           "type" : {
             "type" : "string"
           }
         },
-        "required" : [ "authMethods", "availability", "displayName", "kind", "type" ],
+        "required" : [ "authMethods", "availability", "displayName", "kind", "singleSignOn", "type" ],
         "type" : "object"
       },
       "AddRepositoryRequest" : {
@@ -977,6 +980,40 @@
           }
         },
         "required" : [ "approvalId", "branch", "planHash" ],
+        "type" : "object"
+      },
+      "PublishSettings" : {
+        "properties" : {
+          "branchPrefix" : {
+            "type" : "string"
+          },
+          "draft" : {
+            "type" : "boolean"
+          },
+          "targetBranch" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "branchPrefix", "draft" ],
+        "type" : "object"
+      },
+      "PublishSettingsRequest" : {
+        "properties" : {
+          "branchPrefix" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "draft" : {
+            "type" : "boolean"
+          },
+          "targetBranch" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "branchPrefix", "draft" ],
         "type" : "object"
       },
       "RepoProfile" : {
@@ -2620,6 +2657,68 @@
         "responses" : {
           "204" : {
             "description" : "No Content"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/workspaces/{id}/publishing" : {
+      "get" : {
+        "operationId" : "publishing",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishSettings"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "workspace-controller" ]
+      },
+      "put" : {
+        "operationId" : "setPublishing",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PublishSettingsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublishSettings"
+                }
+              }
+            },
+            "description" : "OK"
           }
         },
         "tags" : [ "workspace-controller" ]

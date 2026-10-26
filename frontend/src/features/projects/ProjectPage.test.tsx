@@ -16,6 +16,7 @@ function setup(role: 'ADMIN' | 'OPERATOR' | 'VIEWER', repos = [repo(), web()]) {
     http.get(`/api/v1/workspaces/${ids.project}/members`, () => HttpResponse.json([{ userId: 'u1', email: 'dev@example.test', displayName: 'dev', role }])),
     http.get('/api/v1/adapter-types', () => HttpResponse.json(adapterTypes)),
     http.get(`/api/v1/workspaces/${ids.project}/tracker`, () => HttpResponse.json({ configured: false })),
+    http.get(`/api/v1/workspaces/${ids.project}/publishing`, () => HttpResponse.json({ branchPrefix: 'devforge/', draft: true })),
   )
 }
 
@@ -109,5 +110,30 @@ describe('Project page', () => {
     renderApp(`/projects/${ids.project}?tab=team`)
     expect(await screen.findByText('No tracker is set, so people paste ticket text when they start a run.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Use Jira (via MCP)' })).not.toBeInTheDocument()
+  })
+
+  it('lets an admin choose where pull requests go: target branch, branch prefix and draft, and shows others the settings read-only', async () => {
+    setup('ADMIN')
+    let put: unknown
+    server.use(
+      http.put(`/api/v1/workspaces/${ids.project}/publishing`, async ({ request }) => {
+        put = await request.json()
+        return HttpResponse.json({ targetBranch: 'develop', branchPrefix: 'feature/', draft: false })
+      }),
+    )
+    const user = userEvent.setup()
+    const first = renderApp(`/projects/${ids.project}?tab=team`)
+    await user.type(await screen.findByLabelText('Target branch'), 'develop')
+    await user.clear(screen.getByLabelText('Branch prefix'))
+    await user.type(screen.getByLabelText('Branch prefix'), 'feature/')
+    await user.click(screen.getByRole('checkbox', { name: 'Open pull requests as drafts' }))
+    await user.click(screen.getAllByRole('button', { name: 'Save' }).at(-1) as HTMLElement)
+    await waitFor(() => expect(put).toEqual({ targetBranch: 'develop', branchPrefix: 'feature/', draft: false }))
+    first.unmount()
+
+    setup('OPERATOR')
+    renderApp(`/projects/${ids.project}?tab=team`)
+    expect(await screen.findByLabelText('Target branch')).toBeDisabled()
+    expect(screen.getByLabelText('Branch prefix')).toHaveValue('devforge/')
   })
 })

@@ -14,4 +14,7 @@ public interface Workspaces {
     List<WorkspaceRepoView> repositories(UUID workspaceId);
 
     java.util.Optional<TrackerBinding> tracker(UUID workspaceId);
+
+    /** How this project's changes are published (defaults if never set). */
+    PublishSettings publishSettings(UUID workspaceId);
 }

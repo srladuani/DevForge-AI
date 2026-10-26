@@ -8,6 +8,7 @@ import { ApiError, errorMessage } from '../../lib/api/client'
 import { shortHash, timeAgo, titleCase } from '../../lib/format'
 import { useApprovals, useDecide, type Approval } from '../approvals/api'
 import type { Run } from './api'
+import { hostName, parsePublishSummary } from './publishSummary'
 
 const TONE: Record<string, Tone> = { PENDING: 'warn', APPROVED: 'ok', REJECTED: 'danger', SUPERSEDED: 'neutral', EXPIRED: 'neutral' }
 
@@ -27,31 +28,6 @@ function parseSummary(s: string): { filesToChange: string[]; commands: string[];
     // an unreadable summary is shown as empty; the hash still identifies what is approved
   }
   return out
-}
-
-type PublishSummary = { branch: string; title: string; draft: boolean; host: string; repositories: Array<{ repository: string; remote: string; base: string; files: string[] }> }
-
-function parsePublishSummary(s: string): PublishSummary | null {
-  try {
-    const v: unknown = JSON.parse(s)
-    if (typeof v !== 'object' || v === null) return null
-    const o = v as Record<string, unknown>
-    const repos = Array.isArray(o.repositories) ? o.repositories : []
-    const strs = (x: unknown) => (Array.isArray(x) ? x.filter((y): y is string => typeof y === 'string') : [])
-    return {
-      branch: typeof o.branch === 'string' ? o.branch : '',
-      title: typeof o.title === 'string' ? o.title : '',
-      draft: o.draft === true,
-      host: typeof o.host === 'string' ? o.host : '',
-      repositories: repos.flatMap((r: unknown) => {
-        if (typeof r !== 'object' || r === null) return []
-        const x = r as Record<string, unknown>
-        return [{ repository: String(x.repository ?? ''), remote: String(x.remote ?? ''), base: String(x.base ?? ''), files: strs(x.files) }]
-      }),
-    }
-  } catch {
-    return null
-  }
 }
 
 export function ApprovalsTab({ run, canApprove }: { run: Run; canApprove: boolean }) {
@@ -82,7 +58,7 @@ function PendingApproval({ approval, run, canApprove }: { approval: Approval; ru
         {publish ? (
           <>
             <p>
-              Approving lets DevForge <strong>push a new branch</strong> <code className="font-mono text-xs">{publish.branch}</code> and open a <strong>{publish.draft ? 'draft ' : ''}pull request</strong> on {publish.host === 'GITHUB' ? 'GitHub' : publish.host},
+              Approving lets DevForge <strong>push a new branch</strong> <code className="font-mono text-xs">{publish.branch}</code> and open a <strong>{publish.draft ? 'draft ' : ''}pull request</strong> on {hostName(publish.host)},
               using the run owner&apos;s own token. Nothing is merged. This approval is bound to plan <span className="font-mono">{shortHash(approval.artifactHash)}</span> and stops counting if anything in it changes.
             </p>
             <p>
@@ -92,7 +68,7 @@ function PendingApproval({ approval, run, canApprove }: { approval: Approval; ru
               {publish.repositories.map((r) => (
                 <li key={r.repository} className="rounded-md bg-surface-2 p-3">
                   <p>
-                    <strong>{r.repository}</strong> → <span className="font-mono text-xs">{r.remote}</span> (into <span className="font-mono text-xs">{r.base}</span>)
+                    <strong>{r.repository}</strong> → {hostName(r.host)} <span className="font-mono text-xs">{r.remote}</span> (into <span className="font-mono text-xs">{r.base}</span>)
                   </p>
                   <ul className="mt-1 list-disc pl-5 font-mono text-xs">{r.files.map((f) => <li key={f}>{f}</li>)}</ul>
                 </li>

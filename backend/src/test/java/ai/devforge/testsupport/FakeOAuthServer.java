@@ -30,6 +30,11 @@ public final class FakeOAuthServer implements AutoCloseable {
     public volatile String currentAccess = "at-1";
     public volatile String currentRefresh = "rt-1";
     public volatile String authorizeHost; // for the "metadata points somewhere else" test
+    /** false for a provider without PKCE (Bitbucket Cloud) */
+    public volatile boolean requirePkce = true;
+    /** tokens come without a lifetime or a refresh token (GitHub OAuth apps by default) */
+    public volatile boolean noLifetime;
+    private final List<String> tokenRequests = new CopyOnWriteArrayList<>();
 
     public FakeOAuthServer() {
         try {
@@ -47,6 +52,9 @@ public final class FakeOAuthServer implements AutoCloseable {
 
     public int refreshes() { return refreshes.get(); }
 
+    /** each token request as "<Authorization header>|<form>" (secrets are fake test values) */
+    public List<String> tokenRequests() { return List.copyOf(tokenRequests); }
+
     private void handle(HttpExchange ex) throws IOException {
         String path = ex.getRequestURI().getPath();
         String body = new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
@@ -57,7 +65,10 @@ public final class FakeOAuthServer implements AutoCloseable {
                 registrations.add(body);
                 reply(ex, 201, "{\"client_id\":\"client-1\"}");
             }
-            case "/token" -> token(ex, form(body));
+            case "/token" -> {
+                tokenRequests.add(ex.getRequestHeaders().getFirst("Authorization") + "|" + body);
+                token(ex, form(body));
+            }
             default -> reply(ex, 404, "{}");
         }
     }
@@ -65,7 +76,7 @@ public final class FakeOAuthServer implements AutoCloseable {
     private void token(HttpExchange ex, Map<String, String> f) throws IOException {
         String grant = f.getOrDefault("grant_type", "");
         if (grant.equals("authorization_code")) {
-            if (!"code-1".equals(f.get("code")) || expectedChallenge == null || !expectedChallenge.equals(challenge(f.getOrDefault("code_verifier", "")))) {
+            if (!"code-1".equals(f.get("code")) || (requirePkce && (expectedChallenge == null || !expectedChallenge.equals(challenge(f.getOrDefault("code_verifier", "")))))) {
                 reply(ex, 400, "{\"error\":\"invalid_grant\",\"error_description\":\"code or verifier does not match\"}");
                 return;
             }
@@ -87,6 +98,7 @@ public final class FakeOAuthServer implements AutoCloseable {
     }
 
     private String tokens(String access, String refresh) {
+        if (noLifetime) return "{\"access_token\":\"" + access + "\",\"token_type\":\"bearer\",\"scope\":\"repo\"}";
         return "{\"access_token\":\"" + access + "\",\"refresh_token\":\"" + refresh + "\",\"token_type\":\"Bearer\",\"expires_in\":" + expiresIn + "}";
     }
 

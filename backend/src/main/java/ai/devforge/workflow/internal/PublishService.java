@@ -36,7 +36,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 @Service
 class PublishService {
-    static final String HOST = "GITHUB";
     private final RunService runs;
     private final ExportService exports;
     private final RunDataStore data;
@@ -48,9 +47,11 @@ class PublishService {
     private final GitHosts hosts;
     private final Repositories repositories;
     private final AuditLog audit;
+    private final ai.devforge.workspace.Workspaces workspaces;
 
     PublishService(RunService runs, ExportService exports, RunDataStore data, RunStore store, PublicationStore publications, Publisher publisher, Approvals approvals, Connections connections,
-                   GitHosts hosts, Repositories repositories, AuditLog audit) {
+                   GitHosts hosts, Repositories repositories, AuditLog audit, ai.devforge.workspace.Workspaces workspaces) {
+        this.workspaces = workspaces;
         this.runs = runs;
         this.exports = exports;
         this.data = data;
@@ -70,26 +71,26 @@ class PublishService {
         for (ChangeView c : p.changes()) {
             if (PatchScanner.scan(c.patch()).stream().anyMatch(s -> s.severity().equals("BLOCK"))) throw DomainException.unprocessable("SECRET_IN_PATCH", "The patch for " + c.repoName() + " appears to contain a credential, so it cannot be published");
         }
-        var conn = connections.findUsable(user.id(), ConnectionKind.GIT_HOST, HOST)
-            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify your GitHub token under My connections, then try again"));
-        HostCredential cred = new HostCredential(conn.id(), user.id(), () -> connections.reveal(conn.id(), user.id()));
+        var settings = workspaces.publishSettings(run.workspaceId());
+        Map<String, HostCredential> creds = new java.util.HashMap<>();
         Instant commitTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         List<PublishPlan.PlanRepo> repos = new ArrayList<>();
         try {
             for (ChangeView c : p.changes()) {
                 String remoteUrl = repositories.remoteUrl(c.repositoryId()).orElseThrow(() -> DomainException.unprocessable("NO_REMOTE", c.repoName() + " has no 'origin' remote, so there is nowhere to publish it"));
-                RemoteRepo remote = hosts.resolve(HOST, remoteUrl);
-                String base = hosts.defaultBranch(HOST, cred, remote);
-                repos.add(new PublishPlan.PlanRepo(c.id(), c.repositoryId(), c.repoName(), remote.owner(), remote.name(), remote.pushUrl(), base, Hashes.sha256(c.patch()), c.files(),
+                RemoteRepo remote = hosts.detect(remoteUrl);
+                HostCredential cred = creds.computeIfAbsent(remote.hostType(), type -> credentialFor(user, type));
+                String base = settings.targetBranch() != null ? settings.targetBranch() : hosts.defaultBranch(remote.hostType(), cred, remote);
+                repos.add(new PublishPlan.PlanRepo(c.id(), c.repositoryId(), c.repoName(), remote.hostType(), remote.owner(), remote.name(), remote.pushUrl(), base, Hashes.sha256(c.patch()), c.files(),
                     p.subject() + "\n\n" + ExportService.messageBody(p, c, runId)));
             }
         } catch (GitHostException e) {
             throw switch (e.kind()) {
-                case UNAVAILABLE -> new DomainException("HOST_UNAVAILABLE", HttpStatus.BAD_GATEWAY, "GitHub could not be reached right now; try again");
+                case UNAVAILABLE -> new DomainException("HOST_UNAVAILABLE", HttpStatus.BAD_GATEWAY, "The Git host could not be reached right now (" + e.getMessage() + "); try again");
                 default -> DomainException.unprocessable("HOST_" + e.kind(), e.getMessage());
             };
         }
-        PublishPlan plan = new PublishPlan(HOST, p.branch(), p.subject(), exports.prBody(runId, p), true, commitTime.toString(), repos);
+        PublishPlan plan = new PublishPlan(repos.getFirst().hostType(), p.branch(), p.subject(), exports.prBody(runId, p), settings.draft(), commitTime.toString(), repos);
         var artifact = data.addArtifact(runId, "PUBLISH_PLAN", plan);
         var approval = approvals.request(run.workspaceId(), runId, ApprovalKind.PR, artifact.hash(), summary(plan), user.id());
         store.appendEvent(runId, "PUBLISH_REQUESTED", Map.of("branch", plan.branch(), "repositories", repos.size(), "hash", artifact.hash()));
@@ -105,9 +106,9 @@ class PublishService {
         if (!e.approved()) return;
         RunRow run = store.get(e.runId());
         PublishPlan plan = store.json.readValue(artifact.content(), PublishPlan.class);
-        UUID connectionId = connections.findUsable(run.ownerUserId(), ConnectionKind.GIT_HOST, HOST)
-            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "The run's owner no longer has a verified GitHub connection")).id();
         for (PublishPlan.PlanRepo r : plan.repos()) {
+            UUID connectionId = connections.findUsable(run.ownerUserId(), ConnectionKind.GIT_HOST, r.hostType())
+                .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "The run's owner no longer has a verified " + r.hostType() + " connection")).id();
             if (!publications.create(run.id(), plan, r, connectionId, artifact.hash())) throw DomainException.conflict("ALREADY_PUBLISHED", r.repoName() + " has already been published or is being published");
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -120,9 +121,8 @@ class PublishService {
         ownerRun(runId, user);
         var failed = publications.unfinished(runId);
         if (failed.isEmpty()) throw DomainException.conflict("NOTHING_TO_RETRY", "There is no unfinished publication for this run");
-        UUID connectionId = connections.findUsable(user.id(), ConnectionKind.GIT_HOST, HOST)
-            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify your GitHub token under My connections, then retry")).id();
-        failed.forEach(f -> publications.reset(f.id(), connectionId));
+        failed.forEach(f -> publications.reset(f.id(), connections.findUsable(user.id(), ConnectionKind.GIT_HOST, f.hostType())
+            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify your " + f.hostType() + " connection under My connections, then retry")).id()));
         publisher.runNow(runId);
         return publications.forRun(runId);
     }
@@ -138,14 +138,20 @@ class PublishService {
         return run;
     }
 
+    private HostCredential credentialFor(CurrentUser user, String hostType) {
+        var conn = connections.findUsable(user.id(), ConnectionKind.GIT_HOST, hostType)
+            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify your " + hostType + " connection under My connections, then try again"));
+        return new HostCredential(conn.id(), user.id(), () -> connections.reveal(conn.id(), user.id()), s -> connections.replaceSecret(conn.id(), user.id(), s));
+    }
+
     private String summary(PublishPlan plan) {
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("action", "Push a new branch and open a draft pull request");
+        m.put("action", plan.draft() ? "Push a new branch and open a draft pull request" : "Push a new branch and open a pull request");
         m.put("host", plan.hostType());
         m.put("branch", plan.branch());
         m.put("title", plan.prTitle());
         m.put("draft", plan.draft());
-        m.put("repositories", plan.repos().stream().map(r -> Map.of("repository", r.repoName(), "remote", r.owner() + "/" + r.name(), "base", r.baseBranch(), "files", r.files())).toList());
+        m.put("repositories", plan.repos().stream().map(r -> Map.of("repository", r.repoName(), "host", r.hostType(), "remote", r.owner() + "/" + r.name(), "base", r.baseBranch(), "files", r.files())).toList());
         return store.json.writeValueAsString(m);
     }
 }

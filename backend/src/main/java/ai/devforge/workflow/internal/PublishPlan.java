@@ -8,5 +8,10 @@ import java.util.UUID;
  * the title and body of the pull request, and the commit time; change any of them and the approval no longer applies.
  */
 record PublishPlan(String hostType, String branch, String prTitle, String prBody, boolean draft, String commitTime, List<PlanRepo> repos) {
-    record PlanRepo(UUID changeId, UUID repositoryId, String repoName, String owner, String name, String pushUrl, String baseBranch, String patchHash, List<String> files, String commitMessage) {}
+    /** @param hostType which Git host this repository is on (a project may mix hosts); plans made before this field existed were all GitHub */
+    record PlanRepo(UUID changeId, UUID repositoryId, String repoName, String hostType, String owner, String name, String pushUrl, String baseBranch, String patchHash, List<String> files, String commitMessage) {
+        public PlanRepo {
+            hostType = hostType == null ? "GITHUB" : hostType;
+        }
+    }
 }
