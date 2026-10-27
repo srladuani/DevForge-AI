@@ -153,7 +153,7 @@ class BitbucketHost implements HostAdapter {
             HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(apiBase() + path)).timeout(Duration.ofSeconds(30)).header("Authorization", apiAuthorization(c)).header("Accept", "application/json").header("User-Agent", "devforge-ai");
             if (body != null) b.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)));
             else b.method(method, HttpRequest.BodyPublishers.noBody());
-            HttpResponse<String> res = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> res = HostHttp.send(http, b.build());
             int s = res.statusCode();
             if (s >= 200 && s < 300) return JSON.readTree(res.body());
             String message = message(res.body());
@@ -162,7 +162,7 @@ class BitbucketHost implements HostAdapter {
             if (s == 400 || s == 409 || s == 422) throw new GitHostException(Kind.REJECTED, message);
             throw new GitHostException(Kind.UNAVAILABLE, "Bitbucket answered HTTP " + s);
         } catch (IOException e) {
-            throw new GitHostException(Kind.UNAVAILABLE, "Could not reach Bitbucket");
+            throw new GitHostException(Kind.UNAVAILABLE, "Could not reach Bitbucket (" + e.getMessage() + ")");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new GitHostException(Kind.UNAVAILABLE, "The request to Bitbucket was interrupted");

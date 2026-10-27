@@ -133,7 +133,7 @@ class GitHubHost implements HostAdapter {
                 .header("Accept", "application/vnd.github+json").header("X-GitHub-Api-Version", "2022-11-28").header("User-Agent", "devforge-ai");
             if (body != null) b.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body)));
             else b.method(method, HttpRequest.BodyPublishers.noBody());
-            HttpResponse<String> res = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> res = HostHttp.send(http, b.build());
             int s = res.statusCode();
             if (s >= 200 && s < 300) return JSON.readTree(res.body());
             String message = message(res.body());
@@ -142,7 +142,7 @@ class GitHubHost implements HostAdapter {
             if (s == 422) throw new GitHostException(Kind.REJECTED, message);
             throw new GitHostException(Kind.UNAVAILABLE, "GitHub answered HTTP " + s);
         } catch (IOException e) {
-            throw new GitHostException(Kind.UNAVAILABLE, "Could not reach GitHub");
+            throw new GitHostException(Kind.UNAVAILABLE, "Could not reach GitHub (" + e.getMessage() + ")");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new GitHostException(Kind.UNAVAILABLE, "The request to GitHub was interrupted");
