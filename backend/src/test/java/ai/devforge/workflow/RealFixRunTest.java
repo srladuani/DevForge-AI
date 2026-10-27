@@ -491,4 +491,22 @@ class RealFixRunTest extends WorkflowTestBase {
         api.put(u("owner"), "/api/v1/workspaces/" + ws + "/publishing", "{\"targetBranch\":\"\",\"branchPrefix\":\"feature/\",\"draft\":false}").andExpect(status().isOk()).andExpect(jsonPath("$.targetBranch").doesNotExist());
         api.get(u("outsider"), "/api/v1/workspaces/" + ws + "/publishing").andExpect(status().isNotFound());
     }
+
+    @Test
+    void aRepositoryAccessTokenThatTheAccountEndpointRefusesCanStillBeUsedAndAWrongOneFailsClearlyWhenAPullRequestIsRequested() throws Exception {
+        bb.userEndpointRefusesTokens = true;
+        String run = bitbucketReady(bb.acceptedBearer); // Verify says VALID with a note instead of INVALID
+        String list = api.get(u("owner"), "/api/v1/me/connections").andReturn().getResponse().getContentAsString();
+        assertThat(JsonPath.<List<String>>read(list, "$[?(@.providerType=='BITBUCKET_CLOUD')].statusMessage").getFirst()).contains("normal for a repository or workspace access token");
+        publishAndApprove(run);
+        assertThat(bb.pullCreations()).hasSize(1);
+
+        // a wrong token passes Verify the same way, but the repository itself refuses it when the plan is made, with a clear message
+        String id = JsonPath.<List<String>>read(list, "$[?(@.providerType=='BITBUCKET_CLOUD')].id").getFirst();
+        api.delete(u("owner"), "/api/v1/me/connections/" + id).andExpect(status().isNoContent());
+        bitbucketCredential("owner", "a-wrong-token");
+        String second = runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
+        api.post(u("owner"), "/api/v1/runs/" + second + "/publish", null).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("HOST_AUTH_INVALID"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("refused the credential")));
+    }
 }

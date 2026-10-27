@@ -27,6 +27,12 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
 }
 const AVAILABILITY: Record<string, string> = { REAL: '', SIMULATED: ' (simulated in this build)', PLANNED: ' (planned: can be saved, not used yet)' }
 
+/** The server settings that switch single sign-on on for a provider that needs an administrator-registered OAuth app. */
+const SSO_SETTINGS: Record<string, string> = {
+  BITBUCKET_CLOUD: 'DEVFORGE_OAUTH_BITBUCKET_CLIENT_ID and DEVFORGE_OAUTH_BITBUCKET_CLIENT_SECRET',
+  GITHUB: 'DEVFORGE_OAUTH_GITHUB_CLIENT_ID and DEVFORGE_OAUTH_GITHUB_CLIENT_SECRET',
+}
+
 function authLabel(a: Auth): string {
   return a === 'API_KEY' ? 'API key' : a === 'PAT' ? 'Access token' : 'Sign in with OAuth'
 }
@@ -193,6 +199,14 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
             ))}
           </Select>
         </div>
+        {ssoNotSetUp && adapter && (
+          <Alert tone="info" title={`Single sign-on is not set up for ${adapter.displayName}`}>
+            <p>
+              It needs an OAuth app that an administrator registers once at {adapter.displayName}. Use the callback address <code className="font-mono text-xs">{window.location.origin}/api/v1/oauth/callback</code>, then put the app’s client id and secret in the server’s
+              settings ({SSO_SETTINGS[adapter.type] ?? 'see the runbook'}) and restart DevForge. This button appears as soon as that is done. Until then you can still use a token below. Steps: <code className="font-mono text-xs">docs/engineering/runbook.md</code>, “Single sign-on for Git hosts”.
+            </p>
+          </Alert>
+        )}
         {singleSignOn && adapter && (
           <div className="space-y-2 rounded-md border border-border bg-surface-2 p-3 text-sm">
             <p className="font-medium">Sign in with single sign-on</p>
@@ -213,7 +227,7 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
           </div>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select label="How you sign in" value={auth} onChange={(e) => setAuth(usableAuth.find((m) => m === e.target.value) ?? 'API_KEY')} hint={singleSignOn ? 'Or use single sign-on above.' : ssoNotSetUp ? `Single sign-on for ${adapter?.displayName ?? 'this provider'} is not set up on this server (an administrator has to register an OAuth app); use a token.` : adapter?.authMethods.includes('OAUTH') ? 'Sign-in with OAuth is not available for this provider yet; use a token.' : undefined}>
+          <Select label="How you sign in" value={auth} onChange={(e) => setAuth(usableAuth.find((m) => m === e.target.value) ?? 'API_KEY')} hint={singleSignOn ? 'Or use single sign-on above.' : ssoNotSetUp ? 'Single sign-on is not set up here; use a token (see the note above).' : adapter?.authMethods.includes('OAUTH') ? 'Sign-in with OAuth is not available for this provider yet; use a token.' : undefined}>
             {usableAuth.map((m) => (
               <option key={m} value={m}>
                 {authLabel(m)}

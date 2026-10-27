@@ -39,7 +39,7 @@ class BitbucketConnectionVerifier implements ConnectionVerifier {
         if (!OAuthSecret.looksLikeOAuth(secret)) return verify(secret);
         try {
             String token = oauthTokens.accessToken(new ai.devforge.integration.HostCredential(connectionId, ownerUserId, () -> secret, s -> connections.getObject().replaceSecret(connectionId, ownerUserId, s)));
-            return check("Bearer " + token);
+            return check("Bearer " + token, false);
         } catch (ai.devforge.integration.TrackerException e) {
             return new Result(ConnectionStatus.INVALID, e.getMessage());
         }
@@ -53,10 +53,11 @@ class BitbucketConnectionVerifier implements ConnectionVerifier {
         String raw = secret.strip();
         boolean appPassword = !OAuthSecret.looksLikeOAuth(raw) && raw.contains(":");
         String token = OAuthSecret.looksLikeOAuth(raw) ? OAuthSecret.parse(raw).accessToken() : raw;
-        return check(appPassword ? "Basic " + Base64.getEncoder().encodeToString(token.getBytes(StandardCharsets.UTF_8)) : "Bearer " + token);
+        boolean bareAccessToken = !appPassword && !OAuthSecret.looksLikeOAuth(raw);
+        return check(appPassword ? "Basic " + Base64.getEncoder().encodeToString(token.getBytes(StandardCharsets.UTF_8)) : "Bearer " + token, bareAccessToken);
     }
 
-    private Result check(String authorization) {
+    private Result check(String authorization, boolean bareAccessToken) {
         HttpRequest req = HttpRequest.newBuilder(URI.create(bitbucket.apiBase() + "/user")).timeout(Duration.ofSeconds(20)).header("Authorization", authorization).header("Accept", "application/json").header("User-Agent", "devforge-ai").GET().build();
         try {
             HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString());
@@ -65,6 +66,11 @@ class BitbucketConnectionVerifier implements ConnectionVerifier {
                 var n = JSON.readTree(res.body());
                 String who = n.path("display_name").asString(n.path("username").asString(""));
                 return new Result(ConnectionStatus.VALID, "Signed in to Bitbucket as " + who);
+            }
+            if (s == 401 && bareAccessToken) {
+                // Bitbucket answers 401 on this endpoint for a repository or workspace access token ("not supported for this endpoint") exactly as it does for a wrong one,
+                // so it cannot be told apart here. The token is used on the repository itself when a pull request is created, and a wrong one fails there, clearly.
+                return new Result(ConnectionStatus.VALID, "Bitbucket would not confirm this token on the account endpoint, which is normal for a repository or workspace access token (it cannot say whose it is). It is checked on the repository when you create a pull request, so make sure it has Repositories: Write and Pull requests: Write.");
             }
             if (s == 401) return new Result(ConnectionStatus.INVALID, "Bitbucket rejected this credential");
             if (s == 403) return new Result(ConnectionStatus.VALID, "Bitbucket accepted this credential but it has no account scope, so it cannot say who it belongs to. It will be used when you publish; make sure it can write to the repository and pull requests.");

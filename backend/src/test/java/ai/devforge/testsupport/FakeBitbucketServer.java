@@ -28,6 +28,8 @@ public final class FakeBitbucketServer implements AutoCloseable {
     public volatile String acceptedBasic = "alice:app-password-1";
     public volatile String mainBranch = "main";
     public volatile int pullCreateStatus = 200;
+    /** like Bitbucket for a repository access token: the account endpoint answers 401 even for a good token */
+    public volatile boolean userEndpointRefusesTokens;
     private volatile int next = 11;
 
     public FakeBitbucketServer() {
@@ -64,7 +66,9 @@ public final class FakeBitbucketServer implements AutoCloseable {
         }
         Matcher pulls = PULLS.matcher(path), repo = REPO.matcher(path);
         String method = ex.getRequestMethod();
-        if (path.equals("/user")) {
+        if (path.equals("/user") && userEndpointRefusesTokens) {
+            reply(ex, 401, "{\"type\":\"error\",\"error\":{\"message\":\"Token is invalid, expired, or not supported for this endpoint.\"}}");
+        } else if (path.equals("/user")) {
             reply(ex, 200, "{\"display_name\":\"Alice Dev\",\"username\":\"alice\"}");
         } else if (pulls.matches() && method.equals("GET")) {
             String query = ex.getRequestURI().getQuery() == null ? "" : ex.getRequestURI().getQuery(); // decoded
