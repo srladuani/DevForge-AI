@@ -16,4 +16,4 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties("devforge.agent")
 public record AgentProperties(@DefaultValue("simulated") String mode, @DefaultValue("24") int maxTurns, @DefaultValue("40") int maxToolCalls,
                        @DefaultValue("300000") long maxRunTokens, @DefaultValue("PT8M") Duration stepTimeout, @DefaultValue("PT120S") Duration requestTimeout,
-                       @DefaultValue("12000") int maxToolOutputChars) {}
+                       @DefaultValue("8000") int maxToolOutputChars) {}

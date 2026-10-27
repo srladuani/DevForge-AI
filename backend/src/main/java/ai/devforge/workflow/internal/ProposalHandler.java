@@ -27,7 +27,7 @@ class ProposalHandler implements StepHandler {
     }
 
     private void recordSimulatedUsage(RunRow run) {
-        data.addModelCall(run.id(), "PROPOSING_FIX", run.ownerUserId(), run.agentProvider(), run.agentModel(), 400, 250, null, true);
+        data.addModelCall(run.id(), "PROPOSING_FIX", run.ownerUserId(), run.agentProvider(), run.agentModel(), 400, 250, 0, null, true);
         store.addUsage(run.id(), 400, 250, null);
     }
 

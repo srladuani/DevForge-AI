@@ -177,12 +177,13 @@ class RunDataStore {
     }
 
     // ---- usage
-    void addModelCall(UUID runId, String step, UUID userId, String provider, String model, long in, long out, BigDecimal cost, boolean simulated) {
-        jdbc.sql("insert into model_call (id, run_id, step, user_id, provider, model, input_tokens, output_tokens, cost_usd, simulated) values (?,?,?,?,?,?,?,?,?,?)")
-            .params(UUID.randomUUID(), runId, step, userId, provider, model, in, out, cost, simulated).update();
+    void addModelCall(UUID runId, String step, UUID userId, String provider, String model, long in, long out, long cachedIn, BigDecimal cost, boolean simulated) {
+        jdbc.sql("insert into model_call (id, run_id, step, user_id, provider, model, input_tokens, output_tokens, cached_input_tokens, cost_usd, simulated) values (?,?,?,?,?,?,?,?,?,?,?)")
+            .params(UUID.randomUUID(), runId, step, userId, provider, model, in, out, cachedIn, cost, simulated).update();
         String sim = String.valueOf(simulated);
         meters.counter("devforge.model.tokens", "provider", provider, "direction", "input", "simulated", sim).increment(in);
         meters.counter("devforge.model.tokens", "provider", provider, "direction", "output", "simulated", sim).increment(out);
+        meters.counter("devforge.model.tokens", "provider", provider, "direction", "cached_input", "simulated", sim).increment(cachedIn);
     }
 
     // ---- idempotent re-runs: a step that is executed again after a crash replaces its own earlier output

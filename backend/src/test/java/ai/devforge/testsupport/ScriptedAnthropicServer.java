@@ -85,6 +85,12 @@ public final class ScriptedAnthropicServer implements AutoCloseable {
             + "\"}],\"stop_reason\":\"end_turn\",\"usage\":{\"input_tokens\":" + in + ",\"output_tokens\":" + out + "}}", 0);
     }
 
+    /** A tool request whose usage also reports prompt-cache activity, as the real API does when caching is on. */
+    public static Reply toolUseCached(String id, String tool, String inputJson, int in, int out, int cacheCreation, int cacheRead) {
+        return new Reply(200, "{\"id\":\"msg_t\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-5-5\",\"content\":[{\"type\":\"tool_use\",\"id\":\"" + id + "\",\"name\":\"" + tool
+            + "\",\"input\":" + inputJson + "}],\"stop_reason\":\"tool_use\",\"usage\":{\"input_tokens\":" + in + ",\"output_tokens\":" + out + ",\"cache_creation_input_tokens\":" + cacheCreation + ",\"cache_read_input_tokens\":" + cacheRead + "}}", 0);
+    }
+
     public static Reply failure(int status, String type, String message) { return new Reply(status, error(type, message), 0); }
 
     public static Reply slow(Reply r, long millis) { return new Reply(r.status(), r.body(), millis); }

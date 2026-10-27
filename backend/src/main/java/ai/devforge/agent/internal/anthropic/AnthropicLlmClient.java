@@ -28,9 +28,26 @@ import org.springframework.stereotype.Component;
  */
 @Component
 class AnthropicLlmClient implements ProviderLlmClient {
-    private final AnthropicEndpoint endpoint;
+    /** How much of each request the provider may cache (cached input is billed at a fraction of normal input). */
+    enum Caching { OFF, PREFIX, AUTO }
 
-    AnthropicLlmClient(AnthropicEndpoint endpoint) { this.endpoint = endpoint; }
+    private final AnthropicEndpoint endpoint;
+    private final Caching caching;
+
+    /**
+     * @param caching {@code OFF}; {@code PREFIX} caches the system prompt and tool definitions (the stable start of every request); {@code AUTO}
+     *                also asks the provider to cache the growing conversation, which is what a long tool loop re-sends on every turn. An
+     *                unrecognised value means PREFIX.
+     */
+    @org.springframework.beans.factory.annotation.Autowired
+    AnthropicLlmClient(AnthropicEndpoint endpoint, @org.springframework.beans.factory.annotation.Value("${devforge.agent.prompt-caching:PREFIX}") String caching) {
+        this.endpoint = endpoint;
+        Caching parsed = Caching.PREFIX;
+        for (Caching c : Caching.values()) if (c.name().equalsIgnoreCase(caching == null ? "" : caching.strip())) parsed = c;
+        this.caching = parsed;
+    }
+
+    AnthropicLlmClient(AnthropicEndpoint endpoint) { this(endpoint, "PREFIX"); }
 
     @Override public String provider() { return "ANTHROPIC"; }
 
@@ -38,8 +55,11 @@ class AnthropicLlmClient implements ProviderLlmClient {
     public LlmResponse complete(LlmRequest request, CredentialContext credential) {
         String secret = credential.secret().get(); // lent for this call only; never stored in a field
         try {
-            AnthropicChatModel model = AnthropicChatModel.builder().apiKey(secret).baseUrl(endpoint.baseUrl() + "/v1/").modelName(request.model())
-                .maxTokens(request.maxOutputTokens()).timeout(request.timeout()).maxRetries(0).logRequests(false).logResponses(false).build();
+            var builder = AnthropicChatModel.builder().apiKey(secret).baseUrl(endpoint.baseUrl() + "/v1/").modelName(request.model())
+                .maxTokens(request.maxOutputTokens()).timeout(request.timeout()).maxRetries(0).logRequests(false).logResponses(false);
+            if (caching != Caching.OFF) builder.cacheSystemMessages(true).cacheTools(true);
+            if (caching == Caching.AUTO) builder.cacheAutomatically(true);
+            AnthropicChatModel model = builder.build();
             ChatRequest.Builder req = ChatRequest.builder().messages(toMessages(request.messages()));
             if (!request.tools().isEmpty()) req.toolSpecifications(toSpecs(request.tools()));
             ChatResponse r = model.chat(req.build());
@@ -76,11 +96,17 @@ class AnthropicLlmClient implements ProviderLlmClient {
         List<ToolCall> calls = ai.hasToolExecutionRequests() ? ai.toolExecutionRequests().stream().map(t -> new ToolCall(t.id(), t.name(), t.arguments() == null ? "{}" : t.arguments())).toList() : List.of();
         long in = r.tokenUsage() == null || r.tokenUsage().inputTokenCount() == null ? 0 : r.tokenUsage().inputTokenCount();
         long out = r.tokenUsage() == null || r.tokenUsage().outputTokenCount() == null ? 0 : r.tokenUsage().outputTokenCount();
+        // The provider reports cached input separately from "input_tokens"; add it back so the total is everything the model read.
+        long cached = 0;
+        if (r.tokenUsage() instanceof dev.langchain4j.model.anthropic.AnthropicTokenUsage a) {
+            cached = a.cacheReadInputTokens() == null ? 0 : a.cacheReadInputTokens();
+            in += cached + (a.cacheCreationInputTokens() == null ? 0 : a.cacheCreationInputTokens());
+        }
         LlmResponse.FinishReason reason = !calls.isEmpty() ? LlmResponse.FinishReason.TOOL_CALLS : switch (String.valueOf(r.finishReason())) {
             case "LENGTH" -> LlmResponse.FinishReason.MAX_TOKENS;
             case "CONTENT_FILTER" -> LlmResponse.FinishReason.CONTENT_FILTERED;
             default -> LlmResponse.FinishReason.END_TURN;
         };
-        return new LlmResponse(ai.text(), calls, new LlmResponse.Usage(in, out), reason);
+        return new LlmResponse(ai.text(), calls, new LlmResponse.Usage(in, out, cached), reason);
     }
 }

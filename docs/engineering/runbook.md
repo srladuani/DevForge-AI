@@ -54,6 +54,8 @@ Bitbucket Cloud and GitHub have no automatic client registration, so an administ
 ## Configuration that matters (all `devforge.*`, env-overridable)
 | Setting | Default | Meaning |
 |---|---|---|
+| `agent.prompt-caching` | `PREFIX` | Claude prompt cache: `OFF`, `PREFIX` (system prompt + tools), `AUTO` (also the growing conversation; verify on a live run first). Cached tokens are in `model_call.cached_input_tokens` |
+| `agent.max-tool-output-chars` | 8000 | longest tool result shown to the model |
 | `workflow.concurrency` | 2 | runs executing at once per process |
 | `workflow.max-runs-per-user-per-day` | 100 | rolling 24 h; `0` = unlimited. Over it: HTTP 429 `QUOTA_EXCEEDED` |
 | `workflow.max-tokens-per-user-per-day` | 5,000,000 | real-provider tokens, rolling 24 h; `0` = unlimited |

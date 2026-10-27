@@ -33,8 +33,8 @@ class RunContextFactory {
             .map(i -> (List<String>) i.normalized().getOrDefault("keywords", List.of())).orElse(List.of());
         List<RepoTarget> repos = data.repos(run.id()).stream().map(r -> target(r.repositoryId(), r.name(), r.role(), r.baseSha())).toList();
         AgentSelection agent = new AgentSelection(run.agentProvider(), run.agentInstanceId(), run.agentModel(), run.agentModel(), run.agentFastModel(), run.connectionId(), run.simulated());
-        UsageRecorder usage = (stepName, in, out) -> {
-            data.addModelCall(run.id(), stepName, run.ownerUserId(), run.agentProvider(), run.agentModel(), in, out, null, run.simulated());
+        UsageRecorder usage = (stepName, in, out, cached) -> {
+            data.addModelCall(run.id(), stepName, run.ownerUserId(), run.agentProvider(), run.agentModel(), in, out, cached, null, run.simulated());
             store.addUsage(run.id(), in, out, null);
         };
         return new RunContext(run.id(), run.ownerUserId(), agent, text, keywords, repos, step.attempt(), step.cancelRequested(), usage);

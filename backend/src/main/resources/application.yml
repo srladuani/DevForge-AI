@@ -38,7 +38,7 @@ devforge:
     max-run-tokens: 300000   # input + output tokens per investigation
     step-timeout: PT8M
     request-timeout: PT120S  # one model call
-    max-tool-output-chars: 12000
+    max-tool-output-chars: 8000
   execution:
     # Where private working copies live (never inside a user's checkout). Default: <java.io.tmpdir>/devforge-work
     work-root: ${DEVFORGE_WORK_ROOT:}

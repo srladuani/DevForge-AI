@@ -62,7 +62,7 @@ class ImplementationHandler implements StepHandler {
             store.appendEvent(run.id(), "CHANGE_PREPARED", Map.of("repository", repo.name(), "files", c.files(), "attempt", attempt, "simulated", c.simulated()));
         }
         if (run.simulated()) {
-            data.addModelCall(run.id(), "IMPLEMENTATION", run.ownerUserId(), run.agentProvider(), run.agentModel(), 600, 400, null, true);
+            data.addModelCall(run.id(), "IMPLEMENTATION", run.ownerUserId(), run.agentProvider(), run.agentModel(), 600, 400, 0, null, true);
             store.addUsage(run.id(), 600, 400, null);
         }
         return Outcome.next(RunStatus.VALIDATION, changes.size() + " change set(s), attempt " + attempt);

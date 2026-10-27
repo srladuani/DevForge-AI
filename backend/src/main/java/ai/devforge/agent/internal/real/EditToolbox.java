@@ -36,8 +36,8 @@ final class EditToolbox implements AutoCloseable {
             "{\"type\":\"object\",\"properties\":{\"repo\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"old_text\":{\"type\":\"string\"},\"new_text\":{\"type\":\"string\"}},\"required\":[\"repo\",\"path\",\"old_text\",\"new_text\"]}"),
         new ToolSpec("create_file", "Create a new file that the approved proposal lists as new.",
             "{\"type\":\"object\",\"properties\":{\"repo\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"content\":{\"type\":\"string\"}},\"required\":[\"repo\",\"path\",\"content\"]}"),
-        new ToolSpec("read_changed", "Read a file from your working copy, including your edits, with line numbers.",
-            "{\"type\":\"object\",\"properties\":{\"repo\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"}},\"required\":[\"repo\",\"path\"]}"));
+        new ToolSpec("read_changed", "Read lines of a file from your working copy, including your edits, with line numbers. Pass start_line and end_line to read only what you need (at most 150 lines are shown).",
+            "{\"type\":\"object\",\"properties\":{\"repo\":{\"type\":\"string\"},\"path\":{\"type\":\"string\"},\"start_line\":{\"type\":\"integer\"},\"end_line\":{\"type\":\"integer\"}},\"required\":[\"repo\",\"path\"]}"));
 
     static final ToolSpec FINISH_SPEC = new ToolSpec(FINISH, "Call exactly once when the implementation is complete (or you cannot complete it).",
         "{\"type\":\"object\",\"properties\":{\"summary\":{\"type\":\"string\"},\"notes\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"summary\"]}");
@@ -82,15 +82,18 @@ final class EditToolbox implements AutoCloseable {
             String repo = a.path("repo").asString(""), path = a.path("path").asString("");
             RepoTarget target = ctx.repos().stream().filter(r -> r.name().equals(repo)).findFirst().orElse(null);
             if (target == null) return refused(call, "Unknown repository '" + clip(repo) + "'.");
-            if (call.name().equals("read_changed")) return new ToolLoop.Executed(numbered(copy(target).read(path)), false, trace(call, path, "read"), true);
+            if (call.name().equals("read_changed")) return new ToolLoop.Executed(numbered(copy(target).read(path), a.path("start_line").asInt(1), a.path("end_line").asInt(0)), false, trace(call, path, "read"), true);
             if (!allowed.getOrDefault(repo, Set.of()).contains(path)) {
                 return refused(call, repo + ":" + path + " is not in the approved proposal, so it cannot be changed. Mention it in `notes` when you finish instead.");
             }
             Set<String> prot = approvedProtected.getOrDefault(repo, Set.of());
             if (call.name().equals("edit_file")) {
-                copy(target).edit(path, a.path("old_text").asString(""), a.path("new_text").asString(""), prot);
+                String newText = a.path("new_text").asString("");
+                copy(target).edit(path, a.path("old_text").asString(""), newText, prot);
                 edits++;
-                return new ToolLoop.Executed("OK: edited " + path + ". Use read_changed to check the result.", false, trace(call, path, "edited"), false);
+                // Show the result here so the model does not spend a call (and re-send a whole file for the rest of the run) to check it.
+                String shown = changedLines(copy(target).read(path), newText);
+                return new ToolLoop.Executed("OK: edited " + path + "." + shown, false, trace(call, path, "edited"), shown.startsWith(" Now:")); // context lines come from the repository, so they are fenced as data
             }
             copy(target).createFile(path, a.path("content").asString(""), prot);
             edits++;
@@ -119,11 +122,34 @@ final class EditToolbox implements AutoCloseable {
         open.clear();
     }
 
-    private static String numbered(String text) {
+    private static final int READ_LINES = 150;
+    private static final int SNIPPET_CONTEXT = 2;
+    private static final int SNIPPET_MAX_LINES = 20;
+
+    /** Lines {@code from}..{@code to} (1-based; {@code to <= 0} means "as far as allowed") with line numbers, never more than {@link #READ_LINES}. */
+    static String numbered(String text, int from, int to) {
         String[] lines = text.split("\n", -1);
+        int start = Math.max(1, from);
+        int end = Math.min(lines.length, to <= 0 ? start + READ_LINES - 1 : Math.min(to, start + READ_LINES - 1));
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < lines.length && i < 400; i++) sb.append(i + 1).append(": ").append(lines[i]).append('\n');
-        if (lines.length > 400) sb.append("… (").append(lines.length - 400).append(" more lines not shown)\n");
+        for (int i = start; i <= end; i++) sb.append(i).append(": ").append(lines[i - 1]).append('\n');
+        if (end < lines.length) sb.append("… (lines ").append(end + 1).append("-").append(lines.length).append(" not shown; pass start_line and end_line)\n");
+        return sb.toString();
+    }
+
+    /** The edited region with a little context, so an edit's reply is the check. Empty when the new text cannot be located (for example a deletion). */
+    static String changedLines(String content, String newText) {
+        if (newText == null || newText.isEmpty()) return " The text was removed.";
+        int at = content.indexOf(newText);
+        if (at < 0) return "";
+        String[] lines = content.split("\n", -1);
+        int firstLine = (int) content.substring(0, at).chars().filter(c -> c == '\n').count() + 1;
+        int lastLine = firstLine + (int) newText.chars().filter(c -> c == '\n').count();
+        int from = Math.max(1, firstLine - SNIPPET_CONTEXT);
+        int to = Math.min(lines.length, Math.min(lastLine + SNIPPET_CONTEXT, from + SNIPPET_MAX_LINES - 1));
+        StringBuilder sb = new StringBuilder(" Now:\n");
+        for (int i = from; i <= to; i++) sb.append(i).append(": ").append(lines[i - 1]).append('\n');
+        if (to < lastLine + SNIPPET_CONTEXT && to < lines.length) sb.append("… (edited region continues to line ").append(lastLine).append(")\n");
         return sb.toString();
     }
 

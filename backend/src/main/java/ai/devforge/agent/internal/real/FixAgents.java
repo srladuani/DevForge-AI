@@ -31,8 +31,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** The real proposal, implementation and validation steps. Stateless; one call per workflow step. */
 final class FixAgents {
-    static final String PROPOSAL_PROMPT = "fix-planner-v1";
-    static final String IMPLEMENTER_PROMPT = "implementer-v1";
+    static final String PROPOSAL_PROMPT = "fix-planner-v2";
+    static final String IMPLEMENTER_PROMPT = "implementer-v2";
     private static final JsonMapper JSON = JsonMapper.builder().build();
 
     static final ToolSpec SUBMIT_PROPOSAL = new ToolSpec("submit_proposal", "Submit the fix proposal. Call exactly once when you are done.",
@@ -69,7 +69,7 @@ final class FixAgents {
         var loop = new ToolLoop(client, cred, limits, ctx.agent().model(), ctx.cancelRequested());
         var res = loop.run(plannerPrompt, proposalOpening(ctx, findings), RepoToolbox.READ_TOOLS, SUBMIT_PROPOSAL, json -> ProposalParser.parse(json, ctx.repos(), reader),
             call -> { RepoToolbox.Result r = tools.execute(call); return new ToolLoop.Executed(r.text(), r.denied(), r.trace(), true); });
-        ctx.usage().record("PROPOSING_FIX", res.inputTokens(), res.outputTokens());
+        ctx.usage().record("PROPOSING_FIX", res.inputTokens(), res.outputTokens(), res.cachedInputTokens());
         if (res.value() == null) throw new DomainException("AGENT_NO_PROPOSAL", org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "No valid fix proposal was produced: " + res.reason());
         if (!res.complete()) {
             List<String> risks = new ArrayList<>(res.value().risks());
@@ -85,7 +85,7 @@ final class FixAgents {
             specs.addAll(EditToolbox.EDIT_TOOLS);
             var loop = new ToolLoop(client, cred, limits, ctx.agent().model(), ctx.cancelRequested());
             var res = loop.run(implementerPrompt, implementationOpening(ctx, proposal, feedback, validationFailure), specs, EditToolbox.FINISH_SPEC, FixAgents::parseDone, tools::execute);
-            ctx.usage().record("IMPLEMENTATION", res.inputTokens(), res.outputTokens());
+            ctx.usage().record("IMPLEMENTATION", res.inputTokens(), res.outputTokens(), res.cachedInputTokens());
             if (!res.complete()) {
                 throw new DomainException("AGENT_INCOMPLETE", org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY, "The implementation stopped before it was finished (" + res.reason() + "); nothing was kept");
             }

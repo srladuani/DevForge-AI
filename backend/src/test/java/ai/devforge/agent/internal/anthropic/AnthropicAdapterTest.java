@@ -4,6 +4,7 @@ import static ai.devforge.testsupport.ScriptedAnthropicServer.failure;
 import static ai.devforge.testsupport.ScriptedAnthropicServer.slow;
 import static ai.devforge.testsupport.ScriptedAnthropicServer.text;
 import static ai.devforge.testsupport.ScriptedAnthropicServer.toolUse;
+import static ai.devforge.testsupport.ScriptedAnthropicServer.toolUseCached;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -74,6 +75,28 @@ class AnthropicAdapterTest {
         assertThat(sent).contains("be careful").contains("find it").contains("repo_grep").contains("tool_use").contains("tool_result").contains("no match");
         assertThat(sent.indexOf("find it")).isLessThan(sent.indexOf("tool_result"));
         assertThat(sent).contains("\"input_schema\"").contains("\"required\"").contains("\"tags\"");
+    }
+
+    @Test
+    void cachedInputIsAddedToTheInputTotalAndReportedOnItsOwn() {
+        server.then(toolUseCached("toolu_1", "repo_grep", "{\"repo\":\"api\",\"term\":\"video\"}", 21, 9, 100, 900));
+        LlmResponse r = client.complete(request(Duration.ofSeconds(5), ChatMessage.system("s"), ChatMessage.user("u")), key("sk-secret-1"));
+        assertThat(r.usage()).isEqualTo(new LlmResponse.Usage(1021, 9, 900)); // 21 uncached + 100 written to the cache + 900 read from it
+    }
+
+    @Test
+    void promptCachingMarksTheStablePrefixByDefaultAndTheWholeConversationOnlyWhenAsked() throws Exception {
+        var mapper = tools.jackson.databind.json.JsonMapper.builder().build();
+        server.then(text("a", 1, 1)).then(text("b", 1, 1)).then(text("c", 1, 1));
+        var endpoint = new AnthropicEndpoint(providersPointingAt(server));
+        new AnthropicLlmClient(endpoint, "OFF").complete(request(Duration.ofSeconds(5), ChatMessage.system("s"), ChatMessage.user("u")), key("k"));
+        new AnthropicLlmClient(endpoint, "PREFIX").complete(request(Duration.ofSeconds(5), ChatMessage.system("s"), ChatMessage.user("u")), key("k"));
+        new AnthropicLlmClient(endpoint, "AUTO").complete(request(Duration.ofSeconds(5), ChatMessage.system("s"), ChatMessage.user("u")), key("k"));
+        var sent = server.messageRequests();
+        assertThat(sent.get(0).body()).doesNotContain("cache_control");
+        assertThat(sent.get(1).body()).contains("cache_control");
+        assertThat(mapper.readTree(sent.get(1).body()).has("cache_control")).as("PREFIX marks blocks, not the whole request").isFalse();
+        assertThat(mapper.readTree(sent.get(2).body()).has("cache_control")).as("AUTO asks the provider to cache the growing conversation").isTrue();
     }
 
     @Test

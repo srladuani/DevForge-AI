@@ -85,6 +85,15 @@ class InvestigationLoopTest extends IntegrationTest {
         return msgs.getLast().text();
     }
 
+    @Test
+    void cachedInputIsCountedAsInputAndReportedSeparately() {
+        var llm = new ScriptedLlmClient()
+            .thenReturn(new LlmResponse(null, List.of(call("t1", "repo_search_files", "{\"repo\":\"api\",\"keywords\":[\"video\"]}")), new LlmResponse.Usage(1000, 20, 0), LlmResponse.FinishReason.TOOL_CALLS))
+            .thenReturn(new LlmResponse(null, List.of(call("t2", "submit_findings", submit("api", BO, 6, 7, "VERIFIED"))), new LlmResponse.Usage(1200, 30, 900), LlmResponse.FinishReason.TOOL_CALLS));
+        InvestigationResult r = run(llm);
+        assertThat(r.usage()).isEqualTo(new LlmResponse.Usage(2200, 50, 900));
+    }
+
     // ---- the happy path
     @Test
     void searchesReadsAndSubmitsFindingsInsideTheRunsRepositories() {

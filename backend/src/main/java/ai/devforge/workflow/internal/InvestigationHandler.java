@@ -83,12 +83,12 @@ class InvestigationHandler implements StepHandler {
             store.markIncomplete(run.id());
             store.appendEvent(run.id(), "INVESTIGATION_INCOMPLETE", Map.of("reason", String.valueOf(result.incompleteReason())));
         }
-        recordUsage(run, result.usage().inputTokens(), result.usage().outputTokens());
+        recordUsage(run, result.usage().inputTokens(), result.usage().outputTokens(), result.usage().cachedInputTokens());
         return Outcome.next(RunStatus.FINDINGS_AVAILABLE, result.findings().size() + " finding(s)" + (unverified > 0 ? ", " + unverified + " downgraded" : ""));
     }
 
-    private void recordUsage(RunRow run, long in, long out) {
-        data.addModelCall(run.id(), "INVESTIGATION", run.ownerUserId(), run.agentProvider(), run.agentModel(), in, out, null, run.simulated());
+    private void recordUsage(RunRow run, long in, long out, long cached) {
+        data.addModelCall(run.id(), "INVESTIGATION", run.ownerUserId(), run.agentProvider(), run.agentModel(), in, out, cached, null, run.simulated());
         store.addUsage(run.id(), in, out, null);
         store.appendEvent(run.id(), "USAGE", Map.of("step", "INVESTIGATION", "inputTokens", in, "outputTokens", out, "costKnown", false));
     }

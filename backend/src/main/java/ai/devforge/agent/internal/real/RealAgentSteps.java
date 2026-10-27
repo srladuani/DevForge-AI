@@ -50,9 +50,9 @@ class RealAgentSteps implements AgentSteps {
         this.repositories = repositories;
         this.copies = copies;
         this.validator = validator;
-        this.systemPrompt = load("prompts/investigator-v1.md");
-        this.plannerPrompt = load("prompts/fix-planner-v1.md");
-        this.implementerPrompt = load("prompts/implementer-v1.md");
+        this.systemPrompt = load("prompts/investigator-v2.md");
+        this.plannerPrompt = load("prompts/fix-planner-v2.md");
+        this.implementerPrompt = load("prompts/implementer-v2.md");
     }
 
     @Override

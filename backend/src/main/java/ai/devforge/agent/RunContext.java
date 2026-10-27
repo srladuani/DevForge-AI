@@ -11,6 +11,6 @@ import java.util.function.BooleanSupplier;
 public record RunContext(UUID runId, UUID ownerUserId, AgentSelection agent, String inputText, List<String> keywords, List<RepoTarget> repos, int attempt,
                          BooleanSupplier cancelRequested, UsageRecorder usage) {
     public RunContext(UUID runId, UUID ownerUserId, AgentSelection agent, String inputText, List<String> keywords, List<RepoTarget> repos, int attempt, BooleanSupplier cancelRequested) {
-        this(runId, ownerUserId, agent, inputText, keywords, repos, attempt, cancelRequested, (step, in, out) -> { });
+        this(runId, ownerUserId, agent, inputText, keywords, repos, attempt, cancelRequested, (step, in, out, cached) -> { });
     }
 }
