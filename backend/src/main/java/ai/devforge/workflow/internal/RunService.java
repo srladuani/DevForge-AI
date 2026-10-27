@@ -7,7 +7,6 @@ import ai.devforge.audit.AuditLog;
 import ai.devforge.identity.CurrentUser;
 import ai.devforge.platform.DomainException;
 import ai.devforge.platform.Hashes;
-import ai.devforge.repository.Repositories;
 import ai.devforge.workflow.RunMode;
 import ai.devforge.workflow.RunStatus;
 import ai.devforge.workflow.RunViews.AgentView;
@@ -50,7 +49,7 @@ class RunService {
     private final WorkspaceAccess access;
     private final Workspaces workspaces;
     private final ProjectTypes projectTypes;
-    private final Repositories repositories;
+    private final ai.devforge.repository.ManagedRepositories managedRepositories;
     private final ModelCatalog catalog;
     private final AuditLog audit;
     private final TransactionTemplate tx;
@@ -58,7 +57,7 @@ class RunService {
     private final WorkflowProperties props;
     private final io.micrometer.core.instrument.MeterRegistry meters;
 
-    RunService(RunStore store, RunDataStore data, JobQueue queue, WorkspaceAccess access, Workspaces workspaces, ProjectTypes projectTypes, Repositories repositories,
+    RunService(RunStore store, RunDataStore data, JobQueue queue, WorkspaceAccess access, Workspaces workspaces, ProjectTypes projectTypes, ai.devforge.repository.ManagedRepositories managedRepositories,
                ModelCatalog catalog, AuditLog audit, TransactionTemplate tx, TicketFetcher tickets, WorkflowProperties props, io.micrometer.core.instrument.MeterRegistry meters) {
         this.props = props;
         this.meters = meters;
@@ -68,7 +67,7 @@ class RunService {
         this.access = access;
         this.workspaces = workspaces;
         this.projectTypes = projectTypes;
-        this.repositories = repositories;
+        this.managedRepositories = managedRepositories;
         this.catalog = catalog;
         this.audit = audit;
         this.tx = tx;
@@ -113,8 +112,16 @@ class RunService {
             throw new DomainException("TOO_MANY_ACTIVE_RUNS", HttpStatus.TOO_MANY_REQUESTS, "This project already has " + active + " run(s) executing; wait for one to reach a stopping point");
         }
         // Pin each repository to the commit it has right now; every later read and every citation is against that commit.
+        // A repository DevForge cloned is first brought up to date with the branch the change will go into, using the starter's own connection.
         Map<UUID, String> pinned = new LinkedHashMap<>();
-        for (UUID id : repoIds) pinned.put(id, repositories.refresh(id).headSha());
+        Map<UUID, String> syncNotes = new LinkedHashMap<>();
+        String projectTarget = workspaces.publishSettings(workspaceId).targetBranch();
+        for (UUID id : repoIds) {
+            WorkspaceRepoView r = projectRepos.stream().filter(x -> x.repositoryId().equals(id)).findFirst().orElseThrow();
+            var synced = managedRepositories.sync(id, user.id(), r.targetBranch() != null ? r.targetBranch() : projectTarget);
+            pinned.put(id, synced.repository().headSha());
+            if (synced.note() != null) syncNotes.put(id, synced.note());
+        }
 
         UUID runId = UUID.randomUUID();
         try {
@@ -133,6 +140,7 @@ class RunService {
                     data.addRepo(runId, id, r.name(), r.role().name(), pinned.get(id));
                 }
                 store.appendEvent(runId, "RUN_CREATED", Map.of("mode", cmd.mode().name(), "repositories", repoIds.size(), "provider", agent.provider(), "model", agent.model(), "simulated", agent.simulated()));
+                syncNotes.forEach((repoId, note) -> store.appendEvent(runId, "REPOSITORY_NOT_REFRESHED", Map.of("repositoryId", repoId.toString(), "note", note)));
                 queue.enqueue(runId, RunStatus.INPUT_RETRIEVAL.name());
                 audit.record(user.id().toString(), "RUN_CREATED", "run", runId.toString(), cmd.mode() + " via " + agent.provider() + "/" + agent.model());
                 meters.counter("devforge.runs.started", "mode", cmd.mode().name(), "simulated", String.valueOf(agent.simulated())).increment();

@@ -112,7 +112,8 @@ class WorkspaceController {
     @ResponseStatus(HttpStatus.CREATED)
     WorkspaceRepoView addRepository(@PathVariable UUID id, @Valid @RequestBody AddRepositoryRequest r) {
         if (r.cloneUrl() != null && !r.cloneUrl().isBlank()) {
-            throw DomainException.unprocessable("CLONE_NOT_AVAILABLE", "Cloning from a URL arrives with managed clones in a later milestone; register a local path for now");
+            if (r.path() != null && !r.path().isBlank()) throw DomainException.badRequest("PATH_OR_URL", "Give either a repository URL or a path, not both");
+            return service.addRepositoryByUrl(id, users.require().id(), r.cloneUrl(), r.name(), r.role(), r.hints());
         }
         if (r.path() == null || r.path().isBlank()) throw DomainException.badRequest("PATH_REQUIRED", "A local repository path is required");
         return service.addRepository(id, users.require().id(), r.path(), r.name(), r.role(), r.hints());

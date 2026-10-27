@@ -36,6 +36,11 @@ export function useRepos(id: string) {
   return useQuery({ queryKey: projectKeys.repos(id), queryFn: () => unwrap(client.GET('/api/v1/workspaces/{id}/repositories', { params: { path: { id } } })) })
 }
 
+/** How repositories can be added on this server (a URL always; a server path only when the administrator allows it). Assumes paths are allowed until the server says otherwise, since the API enforces it anyway. */
+export function useRepositorySources() {
+  return useQuery({ queryKey: ['repository-sources'] as const, queryFn: () => unwrap(client.GET('/api/v1/repository-sources')), staleTime: Infinity })
+}
+
 export function useMembers(id: string) {
   return useQuery({ queryKey: projectKeys.members(id), queryFn: () => unwrap(client.GET('/api/v1/workspaces/{id}/members', { params: { path: { id } } })) })
 }

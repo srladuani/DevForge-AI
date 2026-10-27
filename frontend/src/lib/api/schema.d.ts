@@ -228,6 +228,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/repository-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["sources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/runs/{id}": {
         parameters: {
             query?: never;
@@ -1009,6 +1025,9 @@ export interface components {
             repositoryId: string;
             role: string;
         };
+        RepositorySources: {
+            localPaths: boolean;
+        };
         RunView: {
             agent: components["schemas"]["AgentView"];
             awaitReason?: string;
@@ -1155,8 +1174,10 @@ export interface components {
                 [key: string]: unknown;
             };
             localPath: string;
+            managed: boolean;
             name: string;
             profile?: components["schemas"]["RepoProfile"];
+            remoteUrl?: string;
             /** Format: uuid */
             repositoryId: string;
             /** @enum {string} */
@@ -1589,6 +1610,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ProjectTypeDefinition"][];
+                };
+            };
+        };
+    };
+    sources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RepositorySources"];
                 };
             };
         };

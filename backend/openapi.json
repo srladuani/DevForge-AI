@@ -1081,6 +1081,15 @@
         "required" : [ "baseSha", "name", "repositoryId", "role" ],
         "type" : "object"
       },
+      "RepositorySources" : {
+        "properties" : {
+          "localPaths" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "localPaths" ],
+        "type" : "object"
+      },
       "RunView" : {
         "properties" : {
           "agent" : {
@@ -1499,11 +1508,17 @@
           "localPath" : {
             "type" : "string"
           },
+          "managed" : {
+            "type" : "boolean"
+          },
           "name" : {
             "type" : "string"
           },
           "profile" : {
             "$ref" : "#/components/schemas/RepoProfile"
+          },
+          "remoteUrl" : {
+            "type" : "string"
           },
           "repositoryId" : {
             "format" : "uuid",
@@ -1517,7 +1532,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "hints", "localPath", "name", "repositoryId", "role" ],
+        "required" : [ "hints", "localPath", "managed", "name", "repositoryId", "role" ],
         "type" : "object"
       },
       "WorkspaceView" : {
@@ -2058,6 +2073,24 @@
           }
         },
         "tags" : [ "workspace-controller" ]
+      }
+    },
+    "/api/v1/repository-sources" : {
+      "get" : {
+        "operationId" : "sources",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RepositorySources"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "repository-sources-controller" ]
       }
     },
     "/api/v1/runs/{id}" : {

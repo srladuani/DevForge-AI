@@ -7,7 +7,8 @@ import { Dialog } from '../../components/ui/Dialog'
 import { Input, Select } from '../../components/ui/Field'
 import { errorMessage } from '../../lib/api/client'
 import { shortSha } from '../../lib/format'
-import { REPO_ROLES, roleLabel, useAddRepo, useRefreshRepo, useRemoveRepo, useRepos, useUpdateRepo, type ProjectRepo, type RepoRole } from './api'
+import { REPO_ROLES, roleLabel, useAddRepo, useRefreshRepo, useRemoveRepo, useRepositorySources, useRepos, useUpdateRepo, type ProjectRepo, type RepoRole } from './api'
+import { locationBody, RepoLocationInput, type RepoSource } from './RepoLocation'
 
 export function ReposTab({ projectId, canManage }: { projectId: string; canManage: boolean }) {
   const { data, isPending, error } = useRepos(projectId)
@@ -27,7 +28,7 @@ export function ReposTab({ projectId, canManage }: { projectId: string; canManag
           <Card key={r.repositoryId}>
             <CardHeader
               title={r.name}
-              subtitle={<span className="font-mono">{r.localPath}</span>}
+              subtitle={<span className="font-mono">{r.managed && r.remoteUrl ? r.remoteUrl : r.localPath}</span>}
               actions={
                 canManage ? (
                   <>
@@ -170,21 +171,24 @@ function TargetBranch({ projectId, repo, canManage }: { projectId: string; repo:
 
 function AddRepoForm({ projectId }: { projectId: string }) {
   const add = useAddRepo(projectId)
-  const [path, setPath] = useState('')
+  const sources = useRepositorySources()
+  const localPaths = sources.data?.localPaths ?? true
+  const [source, setSource] = useState<RepoSource>('URL')
+  const [location, setLocation] = useState('')
   const [role, setRole] = useState<RepoRole>('BACKEND')
   const [name, setName] = useState('')
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    add.mutate({ path: path.trim(), role, ...(name.trim() ? { name: name.trim() } : {}) }, { onSuccess: () => { setPath(''); setName('') } })
+    add.mutate({ ...locationBody(localPaths ? source : 'URL', location), role, ...(name.trim() ? { name: name.trim() } : {}) }, { onSuccess: () => { setLocation(''); setName('') } })
   }
 
   return (
     <Card>
-      <CardHeader title="Add a repository" subtitle="Local path for now; cloning from a URL arrives with managed clones." />
+      <CardHeader title="Add a repository" subtitle="DevForge clones it and keeps its own copy up to date, using your connection for that repository." />
       <form onSubmit={submit} className="space-y-3 p-4">
-        <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
-          <Input label="Path on this machine" value={path} onChange={(e) => setPath(e.target.value)} className="font-mono" required />
+        <RepoLocationInput source={source} value={location} localPaths={localPaths} onSource={setSource} onValue={setLocation} />
+        <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
           <Select label="Role" value={role} onChange={(e) => setRole(REPO_ROLES.find((x) => x.value === e.target.value)?.value ?? 'OTHER')}>
             {REPO_ROLES.map((x) => (
               <option key={x.value} value={x.value}>
@@ -192,10 +196,10 @@ function AddRepoForm({ projectId }: { projectId: string }) {
               </option>
             ))}
           </Select>
+          <Input label="Display name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <Input label="Display name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
         {add.error && <Alert tone="danger" title="Could not add the repository">{errorMessage(add.error)}</Alert>}
-        <Button type="submit" variant="primary" busy={add.isPending} disabled={path.trim() === ''}>
+        <Button type="submit" variant="primary" busy={add.isPending} disabled={location.trim() === ''}>
           Add repository
         </Button>
       </form>

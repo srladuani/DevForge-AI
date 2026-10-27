@@ -26,6 +26,7 @@ export const repo = (over: Partial<S['WorkspaceRepoView']> = {}): S['WorkspaceRe
   role: 'BACKEND',
   hints: {},
   localPath: '/work/api',
+  managed: false,
   defaultBranch: 'main',
   headSha: 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0',
   profile: {

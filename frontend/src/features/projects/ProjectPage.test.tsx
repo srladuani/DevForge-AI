@@ -180,4 +180,19 @@ describe('Project page', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(sent).toEqual({ name: 'Renamed' }))
   })
+
+  it('shows a cloned repository by its address and says plainly when a refresh could not be done', async () => {
+    setup('ADMIN', [repo({ managed: true, remoteUrl: 'https://bitbucket.org/acme/service.git', localPath: '/var/lib/devforge/repos/abc-service' })])
+    server.use(
+      http.post(`/api/v1/workspaces/${ids.project}/repositories/${ids.backend}/refresh`, () =>
+        HttpResponse.json({ code: 'REFRESH_FAILED', detail: 'Not refreshed: the Git host refused your connection for acme/service. Using the code as it was last fetched (a1b2c3d4).', status: 422 }, { status: 422 }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderApp(`/projects/${ids.project}?tab=repositories`)
+    expect(await screen.findByText('https://bitbucket.org/acme/service.git')).toBeInTheDocument()
+    expect(screen.queryByText('/var/lib/devforge/repos/abc-service')).not.toBeInTheDocument() // the server's folder is not something to show
+    await user.click(screen.getByRole('button', { name: 'Refresh' }))
+    expect(await screen.findByText(/the Git host refused your connection for acme\/service/)).toBeInTheDocument()
+  })
 })

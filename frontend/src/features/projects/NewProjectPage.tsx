@@ -6,11 +6,13 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Input, Select } from '../../components/ui/Field'
 import { ApiError, errorMessage } from '../../lib/api/client'
-import { addRepository, REPO_ROLES, useCreateProject, useProjectTypes, type RepoRole } from './api'
+import { addRepository, REPO_ROLES, useCreateProject, useProjectTypes, useRepositorySources, type RepoRole } from './api'
+import { locationBody, RepoLocationInput, type RepoSource } from './RepoLocation'
 
 interface RepoDraft {
   key: number
-  path: string
+  source: RepoSource
+  location: string
   role: RepoRole
   name: string
 }
@@ -18,13 +20,15 @@ interface RepoDraft {
 type Outcome = { state: 'ok' } | { state: 'error'; message: string }
 
 let nextKey = 1
-const blankRepo = (role: RepoRole = 'BACKEND'): RepoDraft => ({ key: nextKey++, path: '', role, name: '' })
+const blankRepo = (role: RepoRole = 'BACKEND'): RepoDraft => ({ key: nextKey++, source: 'URL', location: '', role, name: '' })
 
 /** Step 1: choose what kind of project. Step 2: name it and add one or more repositories, each with a role. Step 3: create. */
 export function NewProjectPage() {
   const navigate = useNavigate()
   const types = useProjectTypes()
   const create = useCreateProject()
+  const sources = useRepositorySources()
+  const localPaths = sources.data?.localPaths ?? true
   const [step, setStep] = useState<1 | 2>(1)
   const [kind, setKind] = useState<string>('SUPPORT')
   const [name, setName] = useState('')
@@ -36,7 +40,7 @@ export function NewProjectPage() {
 
   const selected = types.data?.find((t) => t.kind === kind)
   const nameError = name.trim() === '' ? 'Give the project a name' : undefined
-  const readyRepos = repos.filter((r) => r.path.trim() !== '')
+  const readyRepos = repos.filter((r) => r.location.trim() !== '')
   const canCreate = !busy && !nameError && readyRepos.length > 0
 
   function patch(key: number, change: Partial<RepoDraft>) {
@@ -59,7 +63,7 @@ export function NewProjectPage() {
       for (const r of readyRepos) {
         if (results[r.key]?.state === 'ok') continue
         try {
-          await addRepository(id, { path: r.path.trim(), role: r.role, ...(r.name.trim() ? { name: r.name.trim() } : {}) })
+          await addRepository(id, { ...locationBody(localPaths ? r.source : 'URL', r.location), role: r.role, ...(r.name.trim() ? { name: r.name.trim() } : {}) })
           results[r.key] = { state: 'ok' }
         } catch (err) {
           results[r.key] = { state: 'error', message: err instanceof ApiError ? err.message : errorMessage(err) }
@@ -114,7 +118,7 @@ export function NewProjectPage() {
           <fieldset className="space-y-3">
             <legend className="text-sm font-medium">Repositories</legend>
             <p className="text-sm text-muted">
-              Add every repository this project spans, for example a backend and a web frontend. A run can look at any of them together. Repositories are read from a path on this machine for now; cloning from a URL arrives with managed clones.
+              Add every repository this project spans, for example a backend and a web frontend. A run can look at any of them together. Give each repository’s address and DevForge keeps its own copy up to date, using your connection for that repository.
             </p>
             {repos.map((r, i) => {
               const outcome = outcomes[r.key]
@@ -131,8 +135,8 @@ export function NewProjectPage() {
                       )}
                     </div>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-[1fr_12rem]">
-                    <Input label="Path on this machine" value={r.path} onChange={(e) => patch(r.key, { path: e.target.value })} placeholder="/home/you/work/my-service" disabled={outcome?.state === 'ok'} className="font-mono" />
+                  <RepoLocationInput source={r.source} value={r.location} localPaths={localPaths} disabled={outcome?.state === 'ok'} onSource={(source) => patch(r.key, { source })} onValue={(location) => patch(r.key, { location })} />
+                  <div className="grid gap-3 sm:grid-cols-[12rem_1fr]">
                     <Select label="Role" value={r.role} onChange={(e) => patch(r.key, { role: REPO_ROLES.find((x) => x.value === e.target.value)?.value ?? 'OTHER' })} disabled={outcome?.state === 'ok'}>
                       {REPO_ROLES.map((x) => (
                         <option key={x.value} value={x.value}>
@@ -140,8 +144,8 @@ export function NewProjectPage() {
                         </option>
                       ))}
                     </Select>
+                    <Input label="Display name (optional)" value={r.name} onChange={(e) => patch(r.key, { name: e.target.value })} disabled={outcome?.state === 'ok'} maxLength={100} />
                   </div>
-                  <Input label="Display name (optional)" value={r.name} onChange={(e) => patch(r.key, { name: e.target.value })} disabled={outcome?.state === 'ok'} maxLength={100} />
                   {outcome?.state === 'error' && <Alert tone="danger" title="Could not add this repository">{outcome.message}</Alert>}
                 </Card>
               )
@@ -152,7 +156,7 @@ export function NewProjectPage() {
           {fatal && <Alert tone="danger" title="Could not create the project">{fatal}</Alert>}
           {projectId && failed.length > 0 && (
             <Alert tone="warn" title="The project was created, but some repositories could not be added">
-              Fix the paths above and press the button again to retry only those, or{' '}
+              Fix the addresses above and press the button again to retry only those, or{' '}
               <Link className="underline" to={`/projects/${projectId}`}>
                 open the project
               </Link>{' '}

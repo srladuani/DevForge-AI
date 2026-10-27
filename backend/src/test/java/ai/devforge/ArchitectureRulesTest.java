@@ -27,7 +27,8 @@ class ArchitectureRulesTest {
     static final ArchRule onlyInvestigationCodeMayReadASecret = noClasses().that().resideOutsideOfPackages("ai.devforge.agent.internal.real..", "ai.devforge.identity..")
         .and().doNotHaveFullyQualifiedName("ai.devforge.workflow.internal.TicketFetcher")
         .and().doNotHaveFullyQualifiedName("ai.devforge.workflow.internal.PublishService").and().doNotHaveFullyQualifiedName("ai.devforge.workflow.internal.Publisher")
-        .should().callMethodWhere(target(declaredIn(Connections.class)).and(target(name("reveal")))).because("secrets must not be revealed outside the owner's own agent calls, ticket fetches and publications");
+        .and().doNotHaveFullyQualifiedName("ai.devforge.repository.internal.ManagedRepositoryService")
+        .should().callMethodWhere(target(declaredIn(Connections.class)).and(target(name("reveal")))).because("secrets must not be revealed outside the owner's own agent calls, ticket fetches, publications and clones");
 
     @ArchTest
     static final ArchRule mcpCodeStaysInsideTheIntegrationAdapters = noClasses().that().resideOutsideOfPackage("ai.devforge.integration.internal..")

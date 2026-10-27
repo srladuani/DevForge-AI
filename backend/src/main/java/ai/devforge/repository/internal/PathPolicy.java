@@ -24,10 +24,20 @@ class PathPolicy {
 
     private final List<Path> allowedRoots;
 
+    private final Path managedRoot;
+    private final boolean allowLocalPaths;
+
     PathPolicy(RepositoryProperties props) {
         List<String> configured = props.allowedRoots().isEmpty() ? List.of(System.getProperty("user.home")) : props.allowedRoots();
-        this.allowedRoots = configured.stream().map(PathPolicy::real).toList();
+        this.managedRoot = Paths.get(props.managedRoot().isBlank() ? System.getProperty("user.home") + "/.devforge/repos" : props.managedRoot()).toAbsolutePath().normalize();
+        this.allowLocalPaths = props.allowLocalPaths();
+        // the clones DevForge makes are always readable by it, wherever the administrator put them
+        this.allowedRoots = java.util.stream.Stream.concat(configured.stream().map(PathPolicy::real), java.util.stream.Stream.of(real(managedRoot.toString()))).toList();
     }
+
+    Path managedRoot() { return managedRoot; }
+
+    boolean allowLocalPaths() { return allowLocalPaths; }
 
     private static Path real(String p) {
         try {

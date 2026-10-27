@@ -39,14 +39,16 @@ class WorkspaceService implements Workspaces, WorkspaceAccess {
     private final JsonMapper json;
     private final ProjectTypes projectTypes;
     private final Repositories repositories;
+    private final ai.devforge.repository.ManagedRepositories managed;
     private final Users users;
     private final AuditLog audit;
 
-    WorkspaceService(JdbcClient jdbc, JsonMapper json, ProjectTypes projectTypes, Repositories repositories, Users users, AuditLog audit) {
+    WorkspaceService(JdbcClient jdbc, JsonMapper json, ProjectTypes projectTypes, Repositories repositories, ai.devforge.repository.ManagedRepositories managed, Users users, AuditLog audit) {
         this.jdbc = jdbc;
         this.json = json;
         this.projectTypes = projectTypes;
         this.repositories = repositories;
+        this.managed = managed;
         this.users = users;
         this.audit = audit;
     }
@@ -199,13 +201,29 @@ class WorkspaceService implements Workspaces, WorkspaceAccess {
             .query((rs, i) -> new Object[] {rs.getObject(1, UUID.class), RepoRole.valueOf(rs.getString(2)), rs.getString(3), rs.getString(4)}).list().stream()
             .map(r -> {
                 RepositoryView v = repositories.get((UUID) r[0]);
-                return new WorkspaceRepoView(v.id(), v.name(), (RepoRole) r[1], hints((String) r[2]), v.localPath(), v.defaultBranch(), v.headSha(), v.profile(), (String) r[3]);
+                return new WorkspaceRepoView(v.id(), v.name(), (RepoRole) r[1], hints((String) r[2]), v.localPath(), v.defaultBranch(), v.headSha(), v.profile(), (String) r[3], v.remoteUrl(), v.managed());
             }).toList();
     }
 
     List<WorkspaceRepoView> repositoriesFor(UUID workspaceId, UUID userId) {
         require(workspaceId, userId, Permission.VIEW);
         return repositories(workspaceId);
+    }
+
+    /**
+     * Clones the repository from its URL with the caller's own connection and adds it. Deliberately not one database transaction: the clone can
+     * take minutes, and the only row written at the end is guarded by the table's primary key.
+     */
+    WorkspaceRepoView addRepositoryByUrl(UUID workspaceId, UUID userId, String cloneUrl, String name, RepoRole role, Map<String, Object> hints) {
+        require(workspaceId, userId, Permission.MANAGE);
+        RepositoryView repo = managed.addByUrl(userId, cloneUrl, name, publishSettings(workspaceId).targetBranch());
+        try {
+            jdbc.sql("insert into workspace_repo (workspace_id, repository_id, role, hints) values (?,?,?,?)").params(workspaceId, repo.id(), role.name(), hintsJson(hints)).update();
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            throw DomainException.conflict("REPOSITORY_ALREADY_IN_PROJECT", "That repository is already part of this project");
+        }
+        audit.record(userId.toString(), "REPOSITORY_ADDED", "workspace", workspaceId.toString(), repo.name() + " as " + role + " (cloned)");
+        return repositories(workspaceId).stream().filter(r -> r.repositoryId().equals(repo.id())).findFirst().orElseThrow();
     }
 
     @Transactional
@@ -246,7 +264,11 @@ class WorkspaceService implements Workspaces, WorkspaceAccess {
     WorkspaceRepoView refreshRepository(UUID workspaceId, UUID userId, UUID repoId) {
         require(workspaceId, userId, Permission.MANAGE);
         requireMembership(workspaceId, repoId);
-        repositories.refresh(repoId);
+        var target = repositories(workspaceId).stream().filter(r -> r.repositoryId().equals(repoId)).findFirst().orElseThrow();
+        String branch = target.targetBranch() != null ? target.targetBranch() : publishSettings(workspaceId).targetBranch();
+        var result = managed.sync(repoId, userId, branch);
+        // an explicit Refresh that could not refresh should say so; a run that starts uses the best available code and records the note instead
+        if (target.managed() && !result.refreshed()) throw DomainException.unprocessable("REFRESH_FAILED", result.note() == null ? "The repository could not be refreshed" : result.note());
         return repositories(workspaceId).stream().filter(r -> r.repositoryId().equals(repoId)).findFirst().orElseThrow();
     }
 

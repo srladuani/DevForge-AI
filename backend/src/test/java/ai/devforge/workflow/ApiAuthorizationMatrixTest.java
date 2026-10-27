@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 @TestPropertySource(properties = "devforge.workflow.queue-name=authz-matrix")
 class ApiAuthorizationMatrixTest extends WorkflowTestBase {
     /** Endpoints that are about the caller themself, not about a project: a success for a stranger is correct there. */
-    private static final Set<String> SELF_SCOPED = Set.of("/api/v1/project-types", "/api/v1/workspaces", "/api/v1/adapter-types", "/api/v1/agent-providers", "/api/v1/me/connections");
+    private static final Set<String> SELF_SCOPED = Set.of("/api/v1/project-types", "/api/v1/workspaces", "/api/v1/adapter-types", "/api/v1/agent-providers", "/api/v1/me/connections", "/api/v1/repository-sources");
 
     private record Op(HttpMethod method, String template) {}
 

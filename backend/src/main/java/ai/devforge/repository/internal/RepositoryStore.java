@@ -33,6 +33,7 @@ class RepositoryStore implements Repositories {
 
     @Override
     public RepositoryView registerLocal(String path, String nameOrNull) {
+        if (!policy.allowLocalPaths()) throw DomainException.forbidden("LOCAL_PATHS_DISABLED", "This server does not accept repositories by path; add the repository by its URL instead");
         Path root = policy.validateRepoRoot(path);
         String sha = git.headSha(root);
         String name = nameOrNull != null && !nameOrNull.isBlank() ? nameOrNull.trim() : root.getFileName().toString();
@@ -47,9 +48,9 @@ class RepositoryStore implements Repositories {
 
     @Override
     public Optional<RepositoryView> find(UUID id) {
-        return jdbc.sql("select id, name, local_path, default_branch, head_sha, profile from repository where id = ?").param(id)
+        return jdbc.sql("select id, name, local_path, default_branch, head_sha, profile, remote_url, managed from repository where id = ?").param(id)
             .query((rs, i) -> new RepositoryView(rs.getObject("id", UUID.class), rs.getString("name"), rs.getString("local_path"), rs.getString("default_branch"),
-                rs.getString("head_sha"), rs.getString("profile") == null ? null : json.readValue(rs.getString("profile"), RepoProfile.class)))
+                rs.getString("head_sha"), rs.getString("profile") == null ? null : json.readValue(rs.getString("profile"), RepoProfile.class), rs.getString("remote_url"), rs.getBoolean("managed")))
             .optional();
     }
 
@@ -62,6 +63,21 @@ class RepositoryStore implements Repositories {
     public Optional<String> remoteUrl(UUID id) {
         String url = git.run(rootOf(id), "config", "--get", "remote.origin.url").text().strip();
         return url.isEmpty() ? Optional.empty() : Optional.of(url);
+    }
+
+    /** Records a clone DevForge made itself (internal: only the managed-clone service calls this, with a directory it created). */
+    RepositoryView registerManaged(Path dir, String name, String remoteUrl) {
+        Path root = policy.validateRepoRoot(dir.toString());
+        // the folder is named after the repository, so a moved repository (a new address) keeps its row and clone
+        UUID id = jdbc.sql("select id from repository where local_path = ?").param(root.toString()).query(UUID.class).optional().orElse(null);
+        if (id == null) {
+            id = UUID.randomUUID();
+            jdbc.sql("insert into repository (id, name, local_path, remote_url, managed) values (?, ?, ?, ?, true)").params(id, name, root.toString(), remoteUrl).update();
+            audit.record("system", "REPOSITORY_CLONED", "repository", id.toString(), remoteUrl);
+        } else {
+            jdbc.sql("update repository set remote_url = ?, managed = true where id = ?").params(remoteUrl, id).update();
+        }
+        return refresh(id);
     }
 
     @Override

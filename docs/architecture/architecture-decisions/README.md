@@ -21,3 +21,4 @@ Format: Status · Context · Options · Decision · Consequences · Revisit when
 
 All are *Proposed* until the planning review accepts them.
 | [0015](0015-gradle-build.md) | Gradle (Kotlin DSL, wrapper) for the backend | Accepted |
+| [0016](0016-managed-clones.md) | Managed clones: add a repository by URL, cloned and refreshed with the requester's own connection | Accepted (fake-host verified) |

@@ -70,7 +70,7 @@ class WorkspaceApiTest extends IntegrationTest {
         api.post(u("owner"), "/api/v1/workspaces/" + ws + "/repositories", body).andExpect(status().isCreated());
         api.post(u("owner"), "/api/v1/workspaces/" + ws + "/repositories", body).andExpect(status().isConflict()).andExpect(jsonPath("$.code").value("REPOSITORY_ALREADY_IN_PROJECT"));
         api.post(u("owner"), "/api/v1/workspaces/" + ws + "/repositories", "{\"cloneUrl\":\"https://example.test/a.git\",\"role\":\"BACKEND\"}")
-            .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("CLONE_NOT_AVAILABLE"));
+            .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("CLONE_URL_UNSUPPORTED"));
         api.post(u("owner"), "/api/v1/workspaces/" + ws + "/repositories", "{\"path\":\"/usr\",\"role\":\"BACKEND\"}")
             .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("REPOSITORY_PATH_NOT_ALLOWED"));
         api.post(u("owner"), "/api/v1/workspaces/" + ws + "/repositories", "{\"role\":\"BACKEND\"}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PATH_REQUIRED"));
