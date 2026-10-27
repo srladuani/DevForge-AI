@@ -91,4 +91,48 @@ class ConnectionApiTest extends IntegrationTest {
         mvc.perform(as(post("/api/v1/admin/vault/rotate"), "plain@example.test")).andExpect(status().isForbidden());
         mvc.perform(as(get("/api/v1/admin/audit"), "admin@example.test")).andExpect(status().isOk());
     }
+
+    private String gitHost(String user, String scope, String label) throws Exception {
+        String scopeJson = scope == null ? "" : ",\"scope\":\"" + scope + "\"";
+        MvcResult r = mvc.perform(as(post("/api/v1/me/connections"), user).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kind\":\"GIT_HOST\",\"providerType\":\"BITBUCKET_CLOUD\",\"authMethod\":\"PAT\",\"label\":\"" + label + "\",\"secret\":\"tok-" + label + "\"" + scopeJson + "}"))
+            .andExpect(status().isCreated()).andReturn();
+        String id = JsonPath.read(r.getResponse().getContentAsString(), "$.id");
+        jdbc.sql("update connection set status = 'VALID', last_verified_at = now() where id = ?").param(UUID.fromString(id)).update();
+        return id;
+    }
+
+    @Test
+    void theMostSpecificValidConnectionForARepositoryWins() throws Exception {
+        String any = gitHost("scoped@example.test", null, "any");
+        String wholeOwner = gitHost("scoped@example.test", "Acme/*", "owner");
+        String exact = gitHost("scoped@example.test", "acme/service", "exact");
+        UUID user = users.findByEmail("scoped@example.test").orElseThrow().id();
+        var find = (java.util.function.BiFunction<String, String, String>) (o, n) ->
+            connections.findUsableForRepository(user, ConnectionKind.GIT_HOST, "BITBUCKET_CLOUD", o, n).map(c -> c.id().toString()).orElse("none");
+        assertThat(find.apply("acme", "service")).isEqualTo(exact);
+        assertThat(find.apply("ACME", "Admin")).isEqualTo(wholeOwner);
+        assertThat(find.apply("other", "thing")).isEqualTo(any);
+
+        jdbc.sql("update connection set status = 'INVALID' where id in (?, ?)").params(UUID.fromString(any), UUID.fromString(exact)).update();
+        assertThat(find.apply("acme", "service")).as("an invalid connection is skipped").isEqualTo(wholeOwner);
+        assertThat(find.apply("other", "thing")).as("a connection limited to another owner does not apply").isEqualTo("none");
+    }
+
+    @Test
+    void aScopeMustBeARepositoryOrAnOwnerWildcardAndOnlyGitHostsCanHaveOne() throws Exception {
+        for (String bad : new String[] {"justaname", "a/b/c", "owner/*/x", "has space/repo"}) {
+            mvc.perform(as(post("/api/v1/me/connections"), "badscope@example.test").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"kind\":\"GIT_HOST\",\"providerType\":\"GITHUB\",\"authMethod\":\"PAT\",\"label\":\"x\",\"secret\":\"s\",\"scope\":\"" + bad + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_SCOPE"));
+        }
+        mvc.perform(as(post("/api/v1/me/connections"), "badscope@example.test").contentType(MediaType.APPLICATION_JSON)
+            .content("{\"kind\":\"AI_PROVIDER\",\"providerType\":\"anthropic\",\"authMethod\":\"API_KEY\",\"label\":\"x\",\"secret\":\"s\",\"scope\":\"a/b\"}"))
+            .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SCOPE_NOT_SUPPORTED"));
+        String id = gitHost("badscope@example.test", "acme/service", "narrow");
+        mvc.perform(as(patch("/api/v1/me/connections/" + id), "badscope@example.test").contentType(MediaType.APPLICATION_JSON).content("{\"scope\":\"acme/*\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.scope").value("acme/*"));
+        mvc.perform(as(patch("/api/v1/me/connections/" + id), "badscope@example.test").contentType(MediaType.APPLICATION_JSON).content("{\"scope\":\"\"}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.scope").doesNotExist());
+    }
 }

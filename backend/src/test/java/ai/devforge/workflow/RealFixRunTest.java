@@ -419,8 +419,11 @@ class RealFixRunTest extends WorkflowTestBase {
 
     // ---- publishing to Bitbucket Cloud
 
-    private void bitbucketCredential(String who, String secret) throws Exception {
-        String id = Api.json(api.post(u(who), "/api/v1/me/connections", "{\"kind\":\"GIT_HOST\",\"providerType\":\"BITBUCKET_CLOUD\",\"authMethod\":\"PAT\",\"label\":\"bb\",\"secret\":\"" + secret + "\"}").andExpect(status().isCreated()), "$.id");
+    private void bitbucketCredential(String who, String secret) throws Exception { bitbucketCredential(who, secret, null); }
+
+    private void bitbucketCredential(String who, String secret, String scope) throws Exception {
+        String scopeJson = scope == null ? "" : ",\"scope\":\"" + scope + "\"";
+        String id = Api.json(api.post(u(who), "/api/v1/me/connections", "{\"kind\":\"GIT_HOST\",\"providerType\":\"BITBUCKET_CLOUD\",\"authMethod\":\"PAT\",\"label\":\"bb\",\"secret\":\"" + secret + "\"" + scopeJson + "}").andExpect(status().isCreated()), "$.id");
         api.post(u(who), "/api/v1/me/connections/" + id + "/verify", null).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("VALID"));
     }
 
@@ -508,5 +511,19 @@ class RealFixRunTest extends WorkflowTestBase {
         String second = runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
         api.post(u("owner"), "/api/v1/runs/" + second + "/publish", null).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("HOST_AUTH_INVALID"))
             .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("refused the credential")));
+    }
+
+    @Test
+    void aTokenLimitedToAnotherRepositoryIsNotUsedAndTheMessageNamesTheRepositoryThatHasNoToken() throws Exception {
+        setUpBitbucketRemote();
+        bitbucketCredential("owner", bb.acceptedBearer, "acme/some-other-repo");
+        String run = runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
+        api.post(u("owner"), "/api/v1/runs/" + run + "/publish", null).andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("$.code").value("NO_USABLE_CONNECTION"))
+            .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("acme/service")));
+        assertThat(bb.pullCreations()).isEmpty();
+
+        bitbucketCredential("owner", bb.acceptedBearer, "acme/service");
+        publishAndApprove(run);
+        assertThat(bb.pullCreations()).hasSize(1);
     }
 }

@@ -338,6 +338,9 @@
           "providerType" : {
             "type" : "string"
           },
+          "scope" : {
+            "type" : "string"
+          },
           "status" : {
             "enum" : [ "UNVERIFIED", "VALID", "INVALID", "QUOTA" ],
             "type" : "string"
@@ -370,6 +373,11 @@
           },
           "providerType" : {
             "maxLength" : 40,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "scope" : {
+            "maxLength" : 200,
             "minLength" : 0,
             "type" : "string"
           },
@@ -1356,6 +1364,11 @@
           "label" : {
             "maxLength" : 80,
             "minLength" : 1,
+            "type" : "string"
+          },
+          "scope" : {
+            "maxLength" : 200,
+            "minLength" : 0,
             "type" : "string"
           },
           "secret" : {

@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** The per-user credential vault. Secrets enter here, are stored only as ciphertext, and leave only through {@link #reveal}. */
 @Service
 class ConnectionService implements Connections {
-    private static final String COLS = "id, user_id, kind, provider_type, auth_method, label, status, status_message, last_verified_at, created_at";
+    private static final String COLS = "id, user_id, kind, provider_type, auth_method, label, scope, status, status_message, last_verified_at, created_at";
 
     private final JdbcClient jdbc;
     private final CredentialCipher cipher;
@@ -52,6 +53,16 @@ class ConnectionService implements Connections {
     }
 
     @Override
+    public Optional<ConnectionView> findUsableForRepository(UUID userId, ConnectionKind kind, String providerType, String owner, String name) {
+        String exact = owner + "/" + name;
+        String wholeOwner = owner + "/*";
+        return jdbc.sql("select " + COLS + " from connection where user_id = ? and kind = ? and provider_type = ? and status = 'VALID' "
+                + "and (scope is null or lower(scope) = lower(?) or lower(scope) = lower(?)) "
+                + "order by case when lower(scope) = lower(?) then 0 when scope is not null then 1 else 2 end, last_verified_at desc nulls last limit 1")
+            .params(userId, kind.name(), providerType, exact, wholeOwner, exact).query(ConnectionService::map).optional();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public String reveal(UUID connectionId, UUID ownerUserId) {
         var row = jdbc.sql("select encrypted_secret, key_version, user_id from connection where id = ?").param(connectionId)
@@ -62,11 +73,12 @@ class ConnectionService implements Connections {
     }
 
     @Transactional
-    ConnectionView create(UUID userId, ConnectionKind kind, String providerType, AuthMethod authMethod, String label, String secret) {
+    ConnectionView create(UUID userId, ConnectionKind kind, String providerType, AuthMethod authMethod, String label, String secret, @Nullable String scope) {
+        String normalizedScope = normalizeScope(kind, scope);
         UUID id = UUID.randomUUID();
         var sealed = cipher.seal(secret, id, userId);
-        jdbc.sql("insert into connection (id, user_id, kind, provider_type, auth_method, label, encrypted_secret, key_version) values (?,?,?,?,?,?,?,?)")
-            .params(id, userId, kind.name(), providerType, authMethod.name(), label, sealed.blob(), sealed.keyVersion()).update();
+        jdbc.sql("insert into connection (id, user_id, kind, provider_type, auth_method, label, scope, encrypted_secret, key_version) values (?,?,?,?,?,?,?,?,?)")
+            .params(id, userId, kind.name(), providerType, authMethod.name(), label, normalizedScope, sealed.blob(), sealed.keyVersion()).update();
         audit.record(userId.toString(), "CONNECTION_CREATED", "connection", id.toString(), kind + "/" + providerType + " via " + authMethod);
         return get(id, userId);
     }
@@ -78,7 +90,7 @@ class ConnectionService implements Connections {
             .params(userId, kind.name(), providerType).query(UUID.class).optional().orElse(null);
         UUID id;
         if (existing == null) {
-            id = create(userId, kind, providerType, AuthMethod.OAUTH, label, secret).id();
+            id = create(userId, kind, providerType, AuthMethod.OAUTH, label, secret, null).id();
         } else {
             id = existing;
             var sealed = cipher.seal(secret, id, userId);
@@ -99,8 +111,11 @@ class ConnectionService implements Connections {
     }
 
     @Transactional
-    ConnectionView update(UUID id, UUID userId, String label, String newSecret) {
+    ConnectionView update(UUID id, UUID userId, @Nullable String label, @Nullable String newSecret, @Nullable String scope) {
         ConnectionView existing = get(id, userId);
+        if (scope != null) {
+            jdbc.sql("update connection set scope = ?, updated_at = now() where id = ?").params(normalizeScope(existing.kind(), scope), id).update();
+        }
         if (label != null) {
             jdbc.sql("update connection set label = ?, updated_at = now() where id = ?").params(label, id).update();
         }
@@ -147,6 +162,17 @@ class ConnectionService implements Connections {
         return rows.size();
     }
 
+    private static final java.util.regex.Pattern SCOPE = java.util.regex.Pattern.compile("[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\\*)");
+
+    /** Blank means "any repository". Only Git-host credentials can be narrowed, and only to a repository or to all of an owner's repositories. */
+    private static @Nullable String normalizeScope(ConnectionKind kind, @Nullable String scope) {
+        if (scope == null || scope.isBlank()) return null;
+        if (kind != ConnectionKind.GIT_HOST) throw DomainException.badRequest("SCOPE_NOT_SUPPORTED", "Only Git-host connections can be limited to a repository");
+        String s = scope.strip();
+        if (!SCOPE.matcher(s).matches()) throw DomainException.badRequest("INVALID_SCOPE", "Use owner/repository, or owner/* for every repository of that owner or workspace");
+        return s;
+    }
+
     private ConnectionView get(UUID id, UUID userId) {
         ConnectionView c = jdbc.sql("select " + COLS + " from connection where id = ?").param(id).query(ConnectionService::map).optional()
             .orElseThrow(() -> DomainException.notFound("CONNECTION_NOT_FOUND", "Connection not found"));
@@ -158,7 +184,7 @@ class ConnectionService implements Connections {
     private static ConnectionView map(ResultSet rs, int i) throws SQLException {
         Timestamp verified = rs.getTimestamp("last_verified_at");
         return new ConnectionView(rs.getObject("id", UUID.class), rs.getObject("user_id", UUID.class), ConnectionKind.valueOf(rs.getString("kind")),
-            rs.getString("provider_type"), AuthMethod.valueOf(rs.getString("auth_method")), rs.getString("label"),
+            rs.getString("provider_type"), AuthMethod.valueOf(rs.getString("auth_method")), rs.getString("label"), rs.getString("scope"),
             ConnectionStatus.valueOf(rs.getString("status")), rs.getString("status_message"), verified == null ? null : verified.toInstant(),
             rs.getTimestamp("created_at").toInstant());
     }

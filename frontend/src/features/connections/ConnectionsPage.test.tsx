@@ -80,6 +80,34 @@ describe('My connections', () => {
     await waitFor(() => expect(screen.getByText(/no connections yet/i)).toBeInTheDocument())
   })
 
+  it('lets a Git token be limited to one repository and shows what each token covers', async () => {
+    let list = [connection({ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', kind: 'GIT_HOST', providerType: 'BITBUCKET_CLOUD', authMethod: 'PAT', label: 'Admin token', scope: 'acme/admin' })]
+    let sent: unknown
+    server.use(
+      http.get('/api/v1/adapter-types', () => HttpResponse.json(adapterTypes)),
+      http.get('/api/v1/me/connections', () => HttpResponse.json(list)),
+      http.post('/api/v1/me/connections', async ({ request }) => {
+        sent = await request.json()
+        list = [...list, connection({ id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', kind: 'GIT_HOST', providerType: 'BITBUCKET_CLOUD', authMethod: 'PAT', label: 'Service token', scope: 'acme/service' })]
+        return HttpResponse.json(list[1], { status: 201 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp('/connections')
+
+    expect(await screen.findByText(/only acme\/admin/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/limit to repository/i)).not.toBeInTheDocument() // AI keys cannot be limited
+    await user.selectOptions(await screen.findByLabelText('Type'), 'GIT_HOST')
+    await user.selectOptions(screen.getByLabelText('Provider'), 'BITBUCKET_CLOUD')
+    await user.type(screen.getByLabelText('Label'), 'Service token')
+    await user.type(screen.getByLabelText('Access token'), 'tok-123')
+    await user.type(screen.getByLabelText(/limit to repository/i), ' acme/service ')
+    await user.click(screen.getByRole('button', { name: 'Save connection' }))
+
+    expect(await screen.findByText(/only acme\/service/)).toBeInTheDocument()
+    expect(sent).toMatchObject({ kind: 'GIT_HOST', providerType: 'BITBUCKET_CLOUD', scope: 'acme/service' })
+  })
+
   it('has no detectable accessibility violations', async () => {
     server.use(http.get('/api/v1/adapter-types', () => HttpResponse.json(adapterTypes)), http.get('/api/v1/me/connections', () => HttpResponse.json([connection()])))
     const { container } = renderApp('/connections')

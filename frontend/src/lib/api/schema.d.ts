@@ -758,6 +758,7 @@ export interface components {
             /** Format: date-time */
             lastVerifiedAt?: string;
             providerType: string;
+            scope?: string;
             /** @enum {string} */
             status: "UNVERIFIED" | "VALID" | "INVALID" | "QUOTA";
             statusMessage?: string;
@@ -771,6 +772,7 @@ export interface components {
             kind: "AI_PROVIDER" | "GIT_HOST" | "TRACKER";
             label: string;
             providerType: string;
+            scope?: string;
             secret: string;
         };
         CreateProviderRequest: {
@@ -1105,6 +1107,7 @@ export interface components {
         };
         UpdateConnectionRequest: {
             label?: string;
+            scope?: string;
             secret?: string;
         };
         UpdateProviderRequest: {

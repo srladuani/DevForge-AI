@@ -21,6 +21,12 @@ public interface Connections {
     Optional<ConnectionView> findUsable(UUID userId, ConnectionKind kind, String providerType);
 
     /**
+     * The user's verified-valid connection that may be used for one repository: a connection scoped to exactly {@code owner/name} wins over one
+     * scoped to {@code owner/*}, which wins over an unscoped one. Names compare case-insensitively.
+     */
+    Optional<ConnectionView> findUsableForRepository(UUID userId, ConnectionKind kind, String providerType, String owner, String name);
+
+    /**
      * Decrypts a secret in memory for the owner's own work (a run). Never log or persist the result.
      *
      * @throws ai.devforge.platform.DomainException if the connection does not belong to {@code ownerUserId}

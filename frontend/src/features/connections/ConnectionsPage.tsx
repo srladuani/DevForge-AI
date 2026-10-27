@@ -96,7 +96,8 @@ function ConnectionRow({ c, adapter }: { c: Connection; adapter: AdapterType | u
               {c.label} <span className="font-normal text-muted">· {adapter?.displayName ?? c.providerType}</span>
             </p>
             <p className="mt-0.5 text-xs text-muted">
-              {titleCase(c.kind)} · {authLabel(c.authMethod)} · added {timeAgo(c.createdAt)}
+              {titleCase(c.kind)} · {authLabel(c.authMethod)}
+              {c.kind === 'GIT_HOST' ? ` · ${c.scope ? `only ${c.scope}` : 'any repository'}` : ''} · added {timeAgo(c.createdAt)}
               {c.lastVerifiedAt ? ` · checked ${timeAgo(c.lastVerifiedAt)}` : ''}
             </p>
             {c.statusMessage && <p className="mt-1 text-xs">{c.statusMessage}</p>}
@@ -136,6 +137,7 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
   const [auth, setAuth] = useState<Auth>('API_KEY')
   const [label, setLabel] = useState('')
   const [secret, setSecret] = useState('')
+  const [scope, setScope] = useState('')
   const [saved, setSaved] = useState(false)
 
   const adapter = forKind.find((a) => a.type === provider) ?? forKind[0]
@@ -157,11 +159,12 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
     if (!adapter) return
     setSaved(false)
     create.mutate(
-      { kind, providerType: adapter.type, authMethod: usableAuth.find((m) => m === auth) ?? usableAuth[0] ?? 'API_KEY', label: label.trim(), secret },
+      { kind, providerType: adapter.type, authMethod: usableAuth.find((m) => m === auth) ?? usableAuth[0] ?? 'API_KEY', label: label.trim(), secret, ...(kind === 'GIT_HOST' && scope.trim() !== '' ? { scope: scope.trim() } : {}) },
       {
         onSuccess: () => {
           setSecret('') // the secret never outlives the request in page state
           setLabel('')
+          setScope('')
           setSaved(true)
         },
       },
@@ -247,6 +250,16 @@ function AddConnection({ adapters }: { adapters: AdapterType[] }) {
           hint="Encrypted on save. You will not be able to see it again."
           required
         />
+        {kind === 'GIT_HOST' && (
+          <Input
+            label="Limit to repository (optional)"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+            placeholder="workspace/repository, or workspace/* for all of them"
+            maxLength={200}
+            hint="Leave empty if this token works for every repository you publish to. A token created for one repository needs that repository here; add one connection per repository, and the most specific match is used."
+          />
+        )}
         {create.error && <Alert tone="danger" title="Could not save the connection">{errorMessage(create.error)}</Alert>}
         {saved && <Alert tone="ok">Saved. Press Verify on it to check that it works.</Alert>}
         <Button type="submit" variant="primary" busy={create.isPending} disabled={!adapter || label.trim() === '' || secret.trim() === ''}>

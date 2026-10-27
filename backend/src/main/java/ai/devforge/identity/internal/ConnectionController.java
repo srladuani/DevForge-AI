@@ -36,11 +36,13 @@ class ConnectionController {
     }
 
     record CreateConnectionRequest(@NotNull ConnectionKind kind, @NotBlank @Size(max = 40) String providerType, @NotNull AuthMethod authMethod,
-                                   @NotBlank @Size(max = 80) String label, @NotBlank @Size(max = 4096) String secret) {
+                                   @NotBlank @Size(max = 80) String label, @NotBlank @Size(max = 4096) String secret,
+                                   @Nullable @Size(max = 200) String scope) {
         @Override public String toString() { return "CreateConnectionRequest[kind=" + kind + ", providerType=" + providerType + ", secret=***]"; }
     }
 
-    record UpdateConnectionRequest(@Nullable @Size(min = 1, max = 80) String label, @Nullable @Size(min = 1, max = 4096) String secret) {
+    record UpdateConnectionRequest(@Nullable @Size(min = 1, max = 80) String label, @Nullable @Size(min = 1, max = 4096) String secret,
+                                   @Nullable @Size(max = 200) String scope) {
         @Override public String toString() { return "UpdateConnectionRequest[label=" + label + ", secret=***]"; }
     }
 
@@ -50,13 +52,13 @@ class ConnectionController {
     @PostMapping("/me/connections")
     @ResponseStatus(HttpStatus.CREATED)
     ConnectionView create(@Valid @RequestBody CreateConnectionRequest r) {
-        return service.create(users.require().id(), r.kind(), r.providerType().toUpperCase(), r.authMethod(), r.label(), r.secret());
+        return service.create(users.require().id(), r.kind(), r.providerType().toUpperCase(), r.authMethod(), r.label(), r.secret(), r.scope());
     }
 
     @PatchMapping("/me/connections/{id}")
     ConnectionView update(@PathVariable UUID id, @Valid @RequestBody UpdateConnectionRequest r) {
-        if (r.label() == null && r.secret() == null) throw DomainException.badRequest("NOTHING_TO_UPDATE", "Provide label and/or secret");
-        return service.update(id, users.require().id(), r.label(), r.secret());
+        if (r.label() == null && r.secret() == null && r.scope() == null) throw DomainException.badRequest("NOTHING_TO_UPDATE", "Provide label, secret and/or scope");
+        return service.update(id, users.require().id(), r.label(), r.secret(), r.scope());
     }
 
     @DeleteMapping("/me/connections/{id}")

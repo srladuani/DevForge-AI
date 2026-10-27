@@ -79,7 +79,7 @@ class PublishService {
             for (ChangeView c : p.changes()) {
                 String remoteUrl = repositories.remoteUrl(c.repositoryId()).orElseThrow(() -> DomainException.unprocessable("NO_REMOTE", c.repoName() + " has no 'origin' remote, so there is nowhere to publish it"));
                 RemoteRepo remote = hosts.detect(remoteUrl);
-                HostCredential cred = creds.computeIfAbsent(remote.hostType(), type -> credentialFor(user, type));
+                HostCredential cred = creds.computeIfAbsent(remote.hostType() + ":" + remote.owner() + "/" + remote.name(), k -> credentialFor(user, remote));
                 String base = settings.targetBranch() != null ? settings.targetBranch() : hosts.defaultBranch(remote.hostType(), cred, remote);
                 repos.add(new PublishPlan.PlanRepo(c.id(), c.repositoryId(), c.repoName(), remote.hostType(), remote.owner(), remote.name(), remote.pushUrl(), base, Hashes.sha256(c.patch()), c.files(),
                     p.subject() + "\n\n" + ExportService.messageBody(p, c, runId)));
@@ -107,8 +107,8 @@ class PublishService {
         RunRow run = store.get(e.runId());
         PublishPlan plan = store.json.readValue(artifact.content(), PublishPlan.class);
         for (PublishPlan.PlanRepo r : plan.repos()) {
-            UUID connectionId = connections.findUsable(run.ownerUserId(), ConnectionKind.GIT_HOST, r.hostType())
-                .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "The run's owner no longer has a verified " + r.hostType() + " connection")).id();
+            UUID connectionId = connections.findUsableForRepository(run.ownerUserId(), ConnectionKind.GIT_HOST, r.hostType(), r.owner(), r.name())
+                .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "The run's owner no longer has a verified " + r.hostType() + " connection that covers " + r.owner() + "/" + r.name())).id();
             if (!publications.create(run.id(), plan, r, connectionId, artifact.hash())) throw DomainException.conflict("ALREADY_PUBLISHED", r.repoName() + " has already been published or is being published");
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -121,8 +121,8 @@ class PublishService {
         ownerRun(runId, user);
         var failed = publications.unfinished(runId);
         if (failed.isEmpty()) throw DomainException.conflict("NOTHING_TO_RETRY", "There is no unfinished publication for this run");
-        failed.forEach(f -> publications.reset(f.id(), connections.findUsable(user.id(), ConnectionKind.GIT_HOST, f.hostType())
-            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify your " + f.hostType() + " connection under My connections, then retry")).id()));
+        failed.forEach(f -> publications.reset(f.id(), findForRemote(user, f.hostType(), f.remote())
+            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify a " + f.hostType() + " connection that covers " + f.remote() + " under My connections, then retry")).id()));
         publisher.runNow(runId);
         return publications.forRun(runId);
     }
@@ -138,9 +138,16 @@ class PublishService {
         return run;
     }
 
-    private HostCredential credentialFor(CurrentUser user, String hostType) {
-        var conn = connections.findUsable(user.id(), ConnectionKind.GIT_HOST, hostType)
-            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify your " + hostType + " connection under My connections, then try again"));
+    private java.util.Optional<ai.devforge.identity.ConnectionView> findForRemote(CurrentUser user, String hostType, String ownerSlashName) {
+        int slash = ownerSlashName.indexOf('/');
+        return connections.findUsableForRepository(user.id(), ConnectionKind.GIT_HOST, hostType, ownerSlashName.substring(0, slash), ownerSlashName.substring(slash + 1));
+    }
+
+    private HostCredential credentialFor(CurrentUser user, RemoteRepo remote) {
+        String repo = remote.owner() + "/" + remote.name();
+        var conn = connections.findUsableForRepository(user.id(), ConnectionKind.GIT_HOST, remote.hostType(), remote.owner(), remote.name())
+            .orElseThrow(() -> DomainException.unprocessable("NO_USABLE_CONNECTION", "Add and verify a " + remote.hostType() + " connection that covers " + repo
+                + " under My connections (a connection with no repository limit, limited to " + repo + ", or to " + remote.owner() + "/*), then try again"));
         return new HostCredential(conn.id(), user.id(), () -> connections.reveal(conn.id(), user.id()), s -> connections.replaceSecret(conn.id(), user.id(), s));
     }
 

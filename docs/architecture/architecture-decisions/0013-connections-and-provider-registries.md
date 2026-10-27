@@ -28,3 +28,6 @@ Repo profiles (Gradle, Maven, npm/yarn/pnpm, webpack, Vite…) come from a detec
 − OAuth adds app-registration and token-refresh complexity; per-user Git access means shared clone caches need authorization checks; admin-editable provider config needs validation and audit.
 ## Revisit when
 Multi-tenant hosting (per-tenant OAuth apps and KMS keys), or enterprise SSO delegated tokens become available.
+
+## Amendment: Git connections can be scoped to a repository
+A project may span several repositories, and a repository- or workspace-scoped access token only works for what it was created for. A Git-host `Connection` therefore has an optional `scope` (`owner/name`, `owner/*`, or empty = any repository). A person may hold several connections for one host; publishing picks, per repository, the verified connection with the most specific match (exact, then `owner/*`, then unscoped). Scope narrows where a stored credential is *used*; it does not grant anything, and the host still enforces what the token can do. Other connection kinds cannot be scoped.
