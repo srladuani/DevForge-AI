@@ -108,6 +108,32 @@ describe('My connections', () => {
     expect(sent).toMatchObject({ kind: 'GIT_HOST', providerType: 'BITBUCKET_CLOUD', scope: 'acme/service' })
   })
 
+  it('edits a connection in place: label, repository limit and an optional new token, without ever showing the stored one', async () => {
+    const original = connection({ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', kind: 'GIT_HOST', providerType: 'BITBUCKET_CLOUD', authMethod: 'PAT', label: 'Admin token', scope: 'acme/admin' })
+    let list = [original]
+    const sent: unknown[] = []
+    server.use(
+      http.get('/api/v1/adapter-types', () => HttpResponse.json(adapterTypes)),
+      http.get('/api/v1/me/connections', () => HttpResponse.json(list)),
+      http.patch(`/api/v1/me/connections/${original.id}`, async ({ request }) => {
+        const body = (await request.json()) as { scope?: string }
+        sent.push(body)
+        list = [{ ...original, scope: body.scope ? body.scope : undefined }]
+        return HttpResponse.json(list[0])
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp('/connections')
+    await user.click(await screen.findByRole('button', { name: 'Edit Admin token' }))
+    const dialog = within(await screen.findByRole('dialog', { name: 'Edit Admin token' }))
+    expect(dialog.getByLabelText('Replace the token (optional)')).toHaveValue('')
+    expect(dialog.getByLabelText(/limit to repository/i)).toHaveValue('acme/admin')
+    await user.clear(dialog.getByLabelText(/limit to repository/i))
+    await user.type(dialog.getByLabelText(/limit to repository/i), 'acme/*')
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }))
+    await waitFor(() => expect(sent).toEqual([{ scope: 'acme/*' }])) // only what changed is sent
+  })
+
   it('has no detectable accessibility violations', async () => {
     server.use(http.get('/api/v1/adapter-types', () => HttpResponse.json(adapterTypes)), http.get('/api/v1/me/connections', () => HttpResponse.json([connection()])))
     const { container } = renderApp('/connections')

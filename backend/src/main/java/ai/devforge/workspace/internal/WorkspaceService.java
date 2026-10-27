@@ -195,11 +195,11 @@ class WorkspaceService implements Workspaces, WorkspaceAccess {
     // ---- repositories
     @Override
     public List<WorkspaceRepoView> repositories(UUID workspaceId) {
-        return jdbc.sql("select repository_id, role, hints from workspace_repo where workspace_id = ? order by added_at").param(workspaceId)
-            .query((rs, i) -> new Object[] {rs.getObject(1, UUID.class), RepoRole.valueOf(rs.getString(2)), rs.getString(3)}).list().stream()
+        return jdbc.sql("select repository_id, role, hints, target_branch from workspace_repo where workspace_id = ? order by added_at").param(workspaceId)
+            .query((rs, i) -> new Object[] {rs.getObject(1, UUID.class), RepoRole.valueOf(rs.getString(2)), rs.getString(3), rs.getString(4)}).list().stream()
             .map(r -> {
                 RepositoryView v = repositories.get((UUID) r[0]);
-                return new WorkspaceRepoView(v.id(), v.name(), (RepoRole) r[1], hints((String) r[2]), v.localPath(), v.defaultBranch(), v.headSha(), v.profile());
+                return new WorkspaceRepoView(v.id(), v.name(), (RepoRole) r[1], hints((String) r[2]), v.localPath(), v.defaultBranch(), v.headSha(), v.profile(), (String) r[3]);
             }).toList();
     }
 
@@ -220,9 +220,15 @@ class WorkspaceService implements Workspaces, WorkspaceAccess {
     }
 
     @Transactional
-    WorkspaceRepoView updateRepository(UUID workspaceId, UUID userId, UUID repoId, RepoRole role, Map<String, Object> hints) {
+    WorkspaceRepoView updateRepository(UUID workspaceId, UUID userId, UUID repoId, RepoRole role, Map<String, Object> hints, @org.jspecify.annotations.Nullable String targetBranch) {
         require(workspaceId, userId, Permission.MANAGE);
         requireMembership(workspaceId, repoId);
+        if (targetBranch != null) { // blank clears it
+            String clean = targetBranch.isBlank() ? null : targetBranch.strip();
+            String problem = PublishSettings.branchProblem(clean);
+            if (problem != null) throw DomainException.badRequest("INVALID_TARGET_BRANCH", problem);
+            jdbc.sql("update workspace_repo set target_branch = ? where workspace_id = ? and repository_id = ?").params(clean, workspaceId, repoId).update();
+        }
         if (role != null) jdbc.sql("update workspace_repo set role = ? where workspace_id = ? and repository_id = ?").params(role.name(), workspaceId, repoId).update();
         if (hints != null) jdbc.sql("update workspace_repo set hints = ? where workspace_id = ? and repository_id = ?").params(hintsJson(hints), workspaceId, repoId).update();
         audit.record(userId.toString(), "REPOSITORY_UPDATED", "workspace", workspaceId.toString(), repoId.toString());

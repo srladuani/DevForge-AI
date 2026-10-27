@@ -1409,6 +1409,11 @@
           "role" : {
             "enum" : [ "BACKEND", "WEB_FRONTEND", "MOBILE", "LIBRARY", "OTHER" ],
             "type" : "string"
+          },
+          "targetBranch" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
           }
         },
         "type" : "object"
@@ -1506,6 +1511,9 @@
           },
           "role" : {
             "enum" : [ "BACKEND", "WEB_FRONTEND", "MOBILE", "LIBRARY", "OTHER" ],
+            "type" : "string"
+          },
+          "targetBranch" : {
             "type" : "string"
           }
         },

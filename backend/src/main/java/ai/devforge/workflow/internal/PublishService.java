@@ -72,6 +72,7 @@ class PublishService {
             if (PatchScanner.scan(c.patch()).stream().anyMatch(s -> s.severity().equals("BLOCK"))) throw DomainException.unprocessable("SECRET_IN_PATCH", "The patch for " + c.repoName() + " appears to contain a credential, so it cannot be published");
         }
         var settings = workspaces.publishSettings(run.workspaceId());
+        var projectRepos = workspaces.repositories(run.workspaceId());
         Map<String, HostCredential> creds = new java.util.HashMap<>();
         Instant commitTime = Instant.now().truncatedTo(ChronoUnit.SECONDS);
         List<PublishPlan.PlanRepo> repos = new ArrayList<>();
@@ -80,9 +81,11 @@ class PublishService {
                 String remoteUrl = repositories.remoteUrl(c.repositoryId()).orElseThrow(() -> DomainException.unprocessable("NO_REMOTE", c.repoName() + " has no 'origin' remote, so there is nowhere to publish it"));
                 RemoteRepo remote = hosts.detect(remoteUrl);
                 HostCredential cred = creds.computeIfAbsent(remote.hostType() + ":" + remote.owner() + "/" + remote.name(), k -> credentialFor(user, remote));
-                String base = settings.targetBranch() != null ? settings.targetBranch() : hosts.defaultBranch(remote.hostType(), cred, remote);
+                String repoTarget = projectRepos.stream().filter(wr -> wr.repositoryId().equals(c.repositoryId())).map(ai.devforge.workspace.WorkspaceRepoView::targetBranch).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+                String base = repoTarget != null ? repoTarget : settings.targetBranch() != null ? settings.targetBranch() : hosts.defaultBranch(remote.hostType(), cred, remote);
+                String baseSource = repoTarget != null ? "REPOSITORY" : settings.targetBranch() != null ? "PROJECT" : "HOST_DEFAULT";
                 repos.add(new PublishPlan.PlanRepo(c.id(), c.repositoryId(), c.repoName(), remote.hostType(), remote.owner(), remote.name(), remote.pushUrl(), base, Hashes.sha256(c.patch()), c.files(),
-                    p.subject() + "\n\n" + ExportService.messageBody(p, c, runId)));
+                    p.subject() + "\n\n" + ExportService.messageBody(p, c, runId), baseSource));
             }
         } catch (GitHostException e) {
             throw switch (e.kind()) {
@@ -158,7 +161,7 @@ class PublishService {
         m.put("branch", plan.branch());
         m.put("title", plan.prTitle());
         m.put("draft", plan.draft());
-        m.put("repositories", plan.repos().stream().map(r -> Map.of("repository", r.repoName(), "host", r.hostType(), "remote", r.owner() + "/" + r.name(), "base", r.baseBranch(), "files", r.files())).toList());
+        m.put("repositories", plan.repos().stream().map(r -> Map.of("repository", r.repoName(), "host", r.hostType(), "remote", r.owner() + "/" + r.name(), "base", r.baseBranch(), "baseSource", String.valueOf(r.baseSource()), "files", r.files())).toList());
         return store.json.writeValueAsString(m);
     }
 }

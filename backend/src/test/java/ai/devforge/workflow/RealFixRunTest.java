@@ -526,4 +526,23 @@ class RealFixRunTest extends WorkflowTestBase {
         publishAndApprove(run);
         assertThat(bb.pullCreations()).hasSize(1);
     }
+
+    @Test
+    void aRepositorysOwnTargetBranchBeatsTheProjectsAndThePlanSaysWhereEachBranchCameFrom() throws Exception {
+        api.put(u("owner"), "/api/v1/workspaces/" + ws + "/publishing", "{\"targetBranch\":\"develop\",\"branchPrefix\":\"feature/\",\"draft\":false}").andExpect(status().isOk());
+        api.patch(u("owner"), "/api/v1/workspaces/" + ws + "/repositories/" + backendId, "{\"targetBranch\":\"release/1.0\"}").andExpect(status().isOk()).andExpect(jsonPath("$.targetBranch").value("release/1.0"));
+        api.patch(u("operator"), "/api/v1/workspaces/" + ws + "/repositories/" + backendId, "{\"targetBranch\":\"main\"}").andExpect(status().isForbidden());
+        api.patch(u("owner"), "/api/v1/workspaces/" + ws + "/repositories/" + backendId, "{\"targetBranch\":\"../x\"}").andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_TARGET_BRANCH"));
+        String run = bitbucketReady(bb.acceptedBearer);
+        publishAndApprove(run);
+        assertThat(bb.pullCreations().getFirst().body()).contains("\"destination\":{\"branch\":{\"name\":\"release/1.0\"}}");
+        api.get(u("approver"), "/api/v1/workspaces/" + ws + "/approvals?runId=" + run).andExpect(jsonPath("$[0].summary").value(org.hamcrest.Matchers.containsString("\"baseSource\":\"REPOSITORY\"")));
+
+        // clearing it falls back to the project's branch, and with neither set the plan flags that the host's default was used
+        api.patch(u("owner"), "/api/v1/workspaces/" + ws + "/repositories/" + backendId, "{\"targetBranch\":\"\"}").andExpect(status().isOk()).andExpect(jsonPath("$.targetBranch").doesNotExist());
+        api.put(u("owner"), "/api/v1/workspaces/" + ws + "/publishing", "{\"branchPrefix\":\"feature/\",\"draft\":false}").andExpect(status().isOk());
+        String second = runToReview("package com.acme.video;\nclass TrainingVideoBOTest { }\n");
+        api.post(u("owner"), "/api/v1/runs/" + second + "/publish", null).andExpect(status().isAccepted());
+        api.get(u("approver"), "/api/v1/workspaces/" + ws + "/approvals?runId=" + second).andExpect(jsonPath("$[0].summary").value(org.hamcrest.Matchers.containsString("\"baseSource\":\"HOST_DEFAULT\"")));
+    }
 }

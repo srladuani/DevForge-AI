@@ -1122,6 +1122,7 @@ export interface components {
             };
             /** @enum {string} */
             role?: "BACKEND" | "WEB_FRONTEND" | "MOBILE" | "LIBRARY" | "OTHER";
+            targetBranch?: string;
         };
         UpdateWorkspaceRequest: {
             name?: string;
@@ -1160,6 +1161,7 @@ export interface components {
             repositoryId: string;
             /** @enum {string} */
             role: "BACKEND" | "WEB_FRONTEND" | "MOBILE" | "LIBRARY" | "OTHER";
+            targetBranch?: string;
         };
         WorkspaceView: {
             /** Format: date-time */

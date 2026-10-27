@@ -63,6 +63,12 @@ export function ReposTab({ projectId, canManage }: { projectId: string; canManag
                   )}
                 </dd>
               </div>
+              <div>
+                <dt className="mb-1 text-muted">Pull request target branch</dt>
+                <dd>
+                  <TargetBranch projectId={projectId} repo={r} canManage={canManage} />
+                </dd>
+              </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted">Branch / commit</dt>
                 <dd className="font-mono text-xs">
@@ -127,6 +133,38 @@ export function ReposTab({ projectId, canManage }: { projectId: string; canManag
         </div>
       </Dialog>
     </div>
+  )
+}
+
+/** Where pull requests for this repository go. Empty falls back to the project's target branch, then to the host's default branch. */
+function TargetBranch({ projectId, repo, canManage }: { projectId: string; repo: ProjectRepo; canManage: boolean }) {
+  const update = useUpdateRepo(projectId)
+  const [value, setValue] = useState<string | null>(null)
+  const current = repo.targetBranch ?? ''
+  const shown = value ?? current
+
+  if (!canManage) return <span className="font-mono text-xs">{current || 'the project’s target branch, else the host’s default'}</span>
+  return (
+    <form
+      className="flex flex-wrap items-end gap-2"
+      onSubmit={(e) => {
+        e.preventDefault()
+        update.mutate({ repoId: repo.repositoryId, body: { targetBranch: shown.trim() } }, { onSuccess: () => setValue(null) })
+      }}
+    >
+      <Input
+        label={`Target branch of ${repo.name}`}
+        value={shown}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="the project’s target branch"
+        className="font-mono"
+        hint="For example develop, main or release/1.0. Leave empty to use the project’s setting (People & policy)."
+      />
+      <Button type="submit" busy={update.isPending} disabled={shown.trim() === current}>
+        Save
+      </Button>
+      {update.error && <Alert tone="danger" title="Could not save">{errorMessage(update.error)}</Alert>}
+    </form>
   )
 }
 

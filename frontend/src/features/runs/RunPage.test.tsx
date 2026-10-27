@@ -248,6 +248,22 @@ describe('Run page', () => {
     expect(screen.queryByText(/git am/)).not.toBeInTheDocument()
   })
 
+  it('warns the approver when the pull request target is only the host’s default branch because nothing is configured', async () => {
+    const r = setup({ run: run({ status: 'AWAITING_REVIEW', mode: 'FIX_AND_PATCH', agent: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', simulated: false }, nextActions: ['accept', 'publish', 'cancel'] }) })
+    const change = { id: 'c1', repositoryId: ids.backend, repoName: 'api', baseSha: 'a'.repeat(40), patch: '--- a/X.java\n+++ b/X.java\n@@ -1 +1 @@\n-old\n+new\n', patchHash: 'sha256:1', files: ['X.java'], simulated: false, attempt: 1 }
+    const plan = { runId: r.id, branchName: 'feature/pbx-7-filter', prDescription: '# T', blocked: false, warnings: [], repositories: [{ changeId: 'c1', repoName: 'api', branch: 'feature/pbx-7-filter', commitSubject: 'T', files: ['X.java'], patchFileName: 'x.patch', validationStatus: 'PASSED', secrets: [], downloadable: true }] }
+    const summary = JSON.stringify({ host: 'BITBUCKET_CLOUD', branch: 'feature/pbx-7-filter', title: 'PBX-7: Filter', draft: false, repositories: [{ repository: 'api', host: 'BITBUCKET_CLOUD', remote: 'acme/service', base: 'main', baseSource: 'HOST_DEFAULT', files: ['X.java'] }] })
+    server.use(
+      http.get(`/api/v1/runs/${r.id}/changes`, () => HttpResponse.json([change])),
+      http.get(`/api/v1/runs/${r.id}/export`, () => HttpResponse.json(plan)),
+      http.get(`/api/v1/runs/${r.id}/publications`, () => HttpResponse.json([])),
+      http.get(`/api/v1/workspaces/${ids.project}/approvals`, () => HttpResponse.json([approval({ kind: 'PR', summary })])),
+    )
+    renderApp(`/runs/${ids.run}?tab=changes`)
+    expect(await screen.findByText('No target branch is set for api')).toBeInTheDocument()
+    expect(screen.getByText(/only because nothing is configured/)).toBeInTheDocument()
+  })
+
   it('lets the owner create a pull request: the plan is shown in full, an approver confirms exactly that plan, then the pull request link appears', async () => {
     const r = setup({ run: run({ status: 'AWAITING_REVIEW', mode: 'FIX_AND_PATCH', agent: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', simulated: false }, nextActions: ['accept', 'publish', 'cancel'] }) })
     const change = { id: 'c1', repositoryId: ids.backend, repoName: 'api', baseSha: 'a'.repeat(40), patch: '--- a/X.java\n+++ b/X.java\n@@ -1 +1 @@\n-old\n+new\n', patchHash: 'sha256:1', files: ['X.java'], simulated: false, attempt: 1 }
@@ -255,7 +271,7 @@ describe('Run page', () => {
     let publications: unknown[] = []
     let requested = 0
     let decided: unknown
-    const planSummary = JSON.stringify({ action: 'Push a new branch and open a pull request', host: 'BITBUCKET_CLOUD', branch: 'feature/pbx-7-filter', title: 'PBX-7: Filter', draft: false, repositories: [{ repository: 'api', host: 'BITBUCKET_CLOUD', remote: 'acme/service', base: 'develop', files: ['X.java'] }] })
+    const planSummary = JSON.stringify({ action: 'Push a new branch and open a pull request', host: 'BITBUCKET_CLOUD', branch: 'feature/pbx-7-filter', title: 'PBX-7: Filter', draft: false, repositories: [{ repository: 'api', host: 'BITBUCKET_CLOUD', remote: 'acme/service', base: 'develop', baseSource: 'REPOSITORY', files: ['X.java'] }] })
     let approvals: ReturnType<typeof approval>[] = []
     server.use(
       http.get(`/api/v1/runs/${r.id}/changes`, () => HttpResponse.json([change])),
@@ -284,6 +300,8 @@ describe('Run page', () => {
     expect(section.getByText('feature/pbx-7-filter')).toBeInTheDocument()
     expect(section.getByText('acme/service')).toBeInTheDocument()
     expect(section.getByText('develop')).toBeInTheDocument()
+    expect(section.getByText(/set for this repository/)).toBeInTheDocument()
+    expect(section.queryByText(/No target branch is set/)).not.toBeInTheDocument()
     expect(section.getByText(/Bitbucket Cloud/)).toBeInTheDocument()
     expect(section.getByText('X.java')).toBeInTheDocument()
     expect(section.getByText(/Nothing is merged/)).toBeInTheDocument()

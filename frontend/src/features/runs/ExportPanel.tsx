@@ -7,7 +7,7 @@ import { errorMessage } from '../../lib/api/client'
 import { Link } from 'react-router'
 import { ApiError } from '../../lib/api/client'
 import { useApprovals, useDecide } from '../approvals/api'
-import { hostName, parsePublishSummary } from './publishSummary'
+import { baseSourceLabel, hostName, parsePublishSummary } from './publishSummary'
 import { downloadPatch, useExport, usePublications, useRequestPublish, useRetryPublish, type Change, type Publication } from './api'
 
 /**
@@ -128,7 +128,13 @@ function PublishSection({ runId, workspaceId, canPublish, canApprove, blocked }:
           <ul className="space-y-2">
             {plan.repositories.map((r) => (
               <li key={r.repository}>
-                <strong>{r.repository}</strong> → {hostName(r.host)} <span className="font-mono text-xs">{r.remote}</span> (into <span className="font-mono text-xs">{r.base}</span>)
+                <strong>{r.repository}</strong> → {hostName(r.host)} <span className="font-mono text-xs">{r.remote}</span> (into <span className="font-mono text-xs">{r.base}</span>
+                {baseSourceLabel(r.baseSource) && <span className="text-muted">, {baseSourceLabel(r.baseSource)}</span>})
+                {r.baseSource === 'HOST_DEFAULT' && (
+                  <Alert tone="warn" title={`No target branch is set for ${r.repository}`}>
+                    The pull request goes into {r.base} only because nothing is configured. Cancel and set a target branch under the project’s Repositories tab if that is not where it belongs.
+                  </Alert>
+                )}
                 <ul className="mt-1 list-disc pl-5 font-mono text-xs">{r.files.map((f) => <li key={f}>{f}</li>)}</ul>
               </li>
             ))}

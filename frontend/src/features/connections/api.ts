@@ -39,6 +39,14 @@ export function useCreateConnection() {
   })
 }
 
+export function useUpdateConnection() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { id: string; body: Schemas['UpdateConnectionRequest'] }) => unwrap(client.PATCH('/api/v1/me/connections/{id}', { params: { path: { id: v.id } }, body: v.body })),
+    onSuccess: () => invalidateAll(qc),
+  })
+}
+
 export function useVerifyConnection() {
   const qc = useQueryClient()
   return useMutation({

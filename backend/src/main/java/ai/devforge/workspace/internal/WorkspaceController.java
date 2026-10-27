@@ -49,7 +49,7 @@ class WorkspaceController {
     record UpdateWorkspaceRequest(@Nullable @Size(min = 1, max = 100) String name, @Nullable WorkspacePolicy policy) {}
     record SetMemberRequest(@NotBlank @Size(max = 320) String email, @NotNull WorkspaceRole role) {}
     record AddRepositoryRequest(@Nullable String path, @Nullable String cloneUrl, @Nullable @Size(max = 100) String name, @NotNull RepoRole role, @Nullable Map<String, Object> hints) {}
-    record UpdateRepositoryRequest(@Nullable RepoRole role, @Nullable Map<String, Object> hints) {}
+    record UpdateRepositoryRequest(@Nullable RepoRole role, @Nullable Map<String, Object> hints, @Nullable @Size(max = 100) String targetBranch) {}
 
     @GetMapping("/project-types")
     List<ProjectTypeDefinition> projectTypes() { return projectTypes.all(); }
@@ -120,7 +120,7 @@ class WorkspaceController {
 
     @PatchMapping("/workspaces/{id}/repositories/{repoId}")
     WorkspaceRepoView updateRepository(@PathVariable UUID id, @PathVariable UUID repoId, @Valid @RequestBody UpdateRepositoryRequest r) {
-        return service.updateRepository(id, users.require().id(), repoId, r.role(), r.hints());
+        return service.updateRepository(id, users.require().id(), repoId, r.role(), r.hints(), r.targetBranch());
     }
 
     @DeleteMapping("/workspaces/{id}/repositories/{repoId}")

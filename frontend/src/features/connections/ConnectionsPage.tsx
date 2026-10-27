@@ -9,7 +9,7 @@ import { Input, Select } from '../../components/ui/Field'
 import { errorMessage } from '../../lib/api/client'
 import { goTo } from '../../lib/navigation'
 import { timeAgo, titleCase } from '../../lib/format'
-import { useAdapterTypes, useConnections, useCreateConnection, useDeleteConnection, useStartSignIn, useVerifyConnection, type AdapterType, type Connection } from './api'
+import { useAdapterTypes, useConnections, useCreateConnection, useDeleteConnection, useStartSignIn, useUpdateConnection, useVerifyConnection, type AdapterType, type Connection } from './api'
 
 type Kind = Connection['kind']
 type Auth = Connection['authMethod']
@@ -86,6 +86,7 @@ function ConnectionRow({ c, adapter }: { c: Connection; adapter: AdapterType | u
   const verify = useVerifyConnection()
   const del = useDeleteConnection()
   const [confirm, setConfirm] = useState(false)
+  const [editing, setEditing] = useState(false)
   const s = STATUS[c.status] ?? { label: c.status, tone: 'neutral' as Tone }
   return (
     <li>
@@ -107,6 +108,9 @@ function ConnectionRow({ c, adapter }: { c: Connection; adapter: AdapterType | u
             <Button onClick={() => verify.mutate(c.id)} busy={verify.isPending}>
               Verify
             </Button>
+            <Button variant="ghost" onClick={() => setEditing(true)} aria-label={`Edit ${c.label}`}>
+              Edit
+            </Button>
             <Button variant="ghost" onClick={() => setConfirm(true)} aria-label={`Delete ${c.label}`}>
               Delete
             </Button>
@@ -114,6 +118,9 @@ function ConnectionRow({ c, adapter }: { c: Connection; adapter: AdapterType | u
         </div>
         {verify.error && <div className="px-4 pb-4"><Alert tone="danger">{errorMessage(verify.error)}</Alert></div>}
       </Card>
+      <Dialog open={editing} onClose={() => setEditing(false)} title={`Edit ${c.label}`}>
+        {editing && <EditConnection c={c} onDone={() => setEditing(false)} />}
+      </Dialog>
       <Dialog open={confirm} onClose={() => setConfirm(false)} title="Delete this connection?">
         <p className="text-sm">The stored key is erased. Runs that are paused waiting for it cannot resume until you add another.</p>
         {del.error && <div className="mt-3"><Alert tone="danger">{errorMessage(del.error)}</Alert></div>}
@@ -125,6 +132,53 @@ function ConnectionRow({ c, adapter }: { c: Connection; adapter: AdapterType | u
         </div>
       </Dialog>
     </li>
+  )
+}
+
+/** Label, repository limit and (optionally) a replacement token. The stored token is never shown; leaving the field empty keeps it. */
+function EditConnection({ c, onDone }: { c: Connection; onDone: () => void }) {
+  const update = useUpdateConnection()
+  const [label, setLabel] = useState(c.label)
+  const [scope, setScope] = useState(c.scope ?? '')
+  const [secret, setSecret] = useState('')
+  const gitHost = c.kind === 'GIT_HOST'
+
+  function submit(e: FormEvent) {
+    e.preventDefault()
+    const body: { label?: string; scope?: string; secret?: string } = {}
+    if (label.trim() !== c.label) body.label = label.trim()
+    if (gitHost && scope.trim() !== (c.scope ?? '')) body.scope = scope.trim() // empty clears the limit
+    if (secret !== '') body.secret = secret
+    if (Object.keys(body).length === 0) return onDone()
+    update.mutate({ id: c.id, body }, { onSuccess: onDone })
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-3" autoComplete="off">
+      <Input label="Label" value={label} onChange={(e) => setLabel(e.target.value)} maxLength={80} required />
+      {gitHost && (
+        <Input
+          label="Limit to repository (optional)"
+          value={scope}
+          onChange={(e) => setScope(e.target.value)}
+          placeholder="workspace/repository, or workspace/* for all of them"
+          maxLength={200}
+          hint="Empty means any repository on this host. The most specific connection is used for each repository."
+        />
+      )}
+      {c.authMethod !== 'OAUTH' && (
+        <Input label="Replace the token (optional)" type="password" name="secret" autoComplete="new-password" spellCheck={false} value={secret} onChange={(e) => setSecret(e.target.value)} hint="Leave empty to keep the stored one. A new token has to be verified again." />
+      )}
+      {update.error && <Alert tone="danger" title="Could not save">{errorMessage(update.error)}</Alert>}
+      <div className="flex justify-end gap-2">
+        <Button type="button" onClick={onDone}>
+          Cancel
+        </Button>
+        <Button type="submit" variant="primary" busy={update.isPending} disabled={label.trim() === ''}>
+          Save changes
+        </Button>
+      </div>
+    </form>
   )
 }
 

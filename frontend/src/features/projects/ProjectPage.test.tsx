@@ -136,4 +136,48 @@ describe('Project page', () => {
     expect(await screen.findByLabelText('Target branch')).toBeDisabled()
     expect(screen.getByLabelText('Branch prefix')).toHaveValue('devforge/')
   })
+
+  it('lets an admin set a repository’s own pull request target branch, and clear it again', async () => {
+    setup('ADMIN')
+    const sent: unknown[] = []
+    server.use(
+      http.patch(`/api/v1/workspaces/${ids.project}/repositories/${ids.backend}`, async ({ request }) => {
+        sent.push(await request.json())
+        return HttpResponse.json(repo({ targetBranch: 'release/1.0' }))
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp(`/projects/${ids.project}?tab=repositories`)
+    const field = await screen.findByLabelText('Target branch of api')
+    expect(screen.getByLabelText('Target branch of admin-portal')).toHaveValue('')
+    await user.type(field, 'release/1.0')
+    await user.click(within(field.closest('form') as HTMLElement).getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(sent).toEqual([{ targetBranch: 'release/1.0' }]))
+  })
+
+  it('shows a repository’s target branch read-only to someone who cannot manage the project', async () => {
+    setup('OPERATOR', [repo({ targetBranch: 'develop' })])
+    renderApp(`/projects/${ids.project}?tab=repositories`)
+    expect(await screen.findByText('develop')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Target branch of api')).not.toBeInTheDocument()
+  })
+
+  it('lets an admin rename the project', async () => {
+    setup('ADMIN')
+    let sent: unknown
+    server.use(
+      http.patch(`/api/v1/workspaces/${ids.project}`, async ({ request }) => {
+        sent = await request.json()
+        return HttpResponse.json(project({ name: 'Renamed' }))
+      }),
+    )
+    const user = userEvent.setup()
+    renderApp(`/projects/${ids.project}`)
+    await user.click(await screen.findByRole('button', { name: /^Rename / }))
+    const name = screen.getByLabelText('Project name')
+    await user.clear(name)
+    await user.type(name, 'Renamed')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(sent).toEqual({ name: 'Renamed' }))
+  })
 })
