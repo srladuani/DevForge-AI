@@ -9,10 +9,15 @@ dist/
 target/
 .gradle/
 build/
+*.class
 *.log
 .DS_Store
 .idea/
 .vscode/
+
+# JVM crash logs
+hs_err_pid*
+replay_pid*
 
 # test output
 frontend/playwright-report/
