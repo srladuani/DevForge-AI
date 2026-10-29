@@ -1,0 +1,24 @@
+# Every distinct test configuration starts its own application context and keeps it for the whole run; with the default pool of 10 each one,
+# a dozen contexts exhaust the test database's 100 connections ("too many clients" while loading a context).
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 6
+      minimum-idle: 0
+
+# Test-only vault keys (random, never used anywhere else).
+devforge:
+  security:
+    current-key-version: 1
+    keys:
+      1: "rYQhm0nC8k3WfVvK0t0yC1Tn5wq1gYQd0Q0v3bU5a1o="
+      2: "Zp2yK3mQ8x5VtW7nB1dL6cF9hJ4sR0aE2uG8oI3kM5w="
+    dev-admins: admin@example.test
+  repositories:
+    allowed-roots:
+      - ${java.io.tmpdir}
+  workflow:
+    concurrency: 4
+    poll-millis: 40
+    retry-backoff-millis: 15
+    lease-seconds: 3

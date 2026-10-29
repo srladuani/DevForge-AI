@@ -1,0 +1,176 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useRef, useState } from 'react'
+import { client, unwrap, type Schemas } from '../../lib/api/client'
+import { authorizationHeaders } from '../../lib/auth'
+import { followEvents, type RunEvent } from '../../lib/sse'
+
+export type Run = Schemas['RunView']
+export type Finding = Schemas['FindingView']
+export type Evidence = Schemas['EvidenceView']
+export type Artifact = Schemas['ArtifactView']
+export type Change = Schemas['ChangeView']
+export type Validation = Schemas['ValidationView']
+export type Step = Schemas['StepView']
+export type RunMode = Run['mode']
+export type CreateRun = Schemas['CreateRunRequest']
+
+export const runKeys = {
+  list: (ws: string, status?: string) => ['runs', ws, status ?? 'all'] as const,
+  one: (id: string) => ['run', id] as const,
+  part: (id: string, part: string) => ['run', id, part] as const,
+}
+
+export function useRuns(workspaceId: string, status?: Run['status']) {
+  return useQuery({
+    queryKey: runKeys.list(workspaceId, status),
+    queryFn: () => unwrap(client.GET('/api/v1/workspaces/{workspaceId}/runs', { params: { path: { workspaceId }, query: status ? { status } : {} } })),
+    refetchInterval: 5000,
+  })
+}
+
+export function useRun(id: string) {
+  return useQuery({ queryKey: runKeys.one(id), queryFn: () => unwrap(client.GET('/api/v1/runs/{id}', { params: { path: { id } } })) })
+}
+
+export function useSteps(id: string) {
+  return useQuery({ queryKey: runKeys.part(id, 'steps'), queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/steps', { params: { path: { id } } })) })
+}
+
+export function useFindings(id: string) {
+  return useQuery({ queryKey: runKeys.part(id, 'findings'), queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/findings', { params: { path: { id } } })) })
+}
+
+export function useArtifacts(id: string) {
+  return useQuery({ queryKey: runKeys.part(id, 'artifacts'), queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/artifacts', { params: { path: { id } } })) })
+}
+
+export function useChanges(id: string) {
+  return useQuery({ queryKey: runKeys.part(id, 'changes'), queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/changes', { params: { path: { id } } })) })
+}
+
+export function useValidations(id: string) {
+  return useQuery({ queryKey: runKeys.part(id, 'validations'), queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/validations', { params: { path: { id } } })) })
+}
+
+export function useCreateRun(workspaceId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { body: CreateRun; idempotencyKey: string }) =>
+      unwrap(client.POST('/api/v1/workspaces/{workspaceId}/runs', { params: { path: { workspaceId }, header: { 'Idempotency-Key': v.idempotencyKey } }, body: v.body })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['runs', workspaceId] }),
+  })
+}
+
+export type RunAction = 'cancel' | 'resume' | 'answer' | 'request-fix' | 'complete' | 'request-implementation' | 'accept' | 'request-changes'
+
+export function useRunAction(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { action: RunAction; body?: Schemas['ActionBody'] }) =>
+      unwrap(client.POST('/api/v1/runs/{id}/actions/{action}', { params: { path: { id, action: v.action } }, ...(v.body ? { body: v.body } : {}) })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: runKeys.one(id) }),
+  })
+}
+
+export type StreamStatus = 'connecting' | 'live' | 'reconnecting' | 'closed'
+
+/** Events that change what the screen shows; each refreshes the run's queries (state is always read from the server, never inferred). */
+const REFRESHING = new Set(['STATE_CHANGED', 'FINDING_ADDED', 'ARTIFACT_CREATED', 'CHANGE_PREPARED', 'VALIDATION_RESULT', 'APPROVAL_REQUESTED', 'APPROVAL_DECIDED', 'USAGE', 'CANCEL_REQUESTED', 'NEEDS_INPUT'])
+
+/** Follows a run's live event stream and keeps the cached run data fresh. Reconnects and resumes without losing or repeating events. */
+export function useRunEvents(runId: string): { events: RunEvent[]; status: StreamStatus } {
+  const qc = useQueryClient()
+  // State is tagged with the run it belongs to, so switching runs never shows the previous run's events.
+  const [state, setState] = useState<{ runId: string; events: RunEvent[]; status: StreamStatus }>({ runId, events: [], status: 'connecting' })
+  const pending = useRef(false)
+
+  useEffect(() => {
+    const ctl = new AbortController()
+    const refresh = () => {
+      if (pending.current) return
+      pending.current = true
+      queueMicrotask(() => {
+        pending.current = false
+        void qc.invalidateQueries({ queryKey: runKeys.one(runId) })
+      })
+    }
+    void followEvents(
+      {
+        url: (after) => new URL(`/api/v1/runs/${runId}/events?after=${after}`, window.location.origin).toString(),
+        headers: () => authorizationHeaders(),
+        onEvent: (e) => {
+          setState((prev) => {
+            const base = prev.runId === runId ? prev : { runId, events: [], status: prev.status }
+            return base.events.some((p) => p.seq === e.seq) ? base : { ...base, events: [...base.events, e] }
+          })
+          if (REFRESHING.has(e.type)) refresh()
+        },
+        onStatus: (status) => setState((prev) => (prev.runId === runId ? { ...prev, status } : { runId, events: [], status })),
+      },
+      ctl.signal,
+    )
+    return () => ctl.abort()
+  }, [runId, qc])
+
+  return state.runId === runId ? { events: state.events, status: state.status } : { events: [], status: 'connecting' }
+}
+
+export type TicketPreview = Schemas['Ticket']
+
+/** Reads a ticket with the caller's own tracker connection so they can see what the run will work from. Changes nothing. */
+export function usePreviewTicket(workspaceId: string) {
+  return useMutation({
+    mutationFn: (key: string) => unwrap(client.GET('/api/v1/workspaces/{workspaceId}/tickets/{key}', { params: { path: { workspaceId, key } } })),
+  })
+}
+
+export type ExportPlan = Schemas['ExportView']
+
+/** Branch name, patch files and PR text for a finished change. Local only: nothing is pushed anywhere. */
+export function useExport(runId: string, enabled: boolean) {
+  return useQuery({ queryKey: [...runKeys.one(runId), 'export'], enabled: enabled && runId !== '', queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/export', { params: { path: { id: runId } } })) })
+}
+
+/** The patch is fetched with the caller's identity (a plain link would not carry it) and saved as a file. */
+export async function downloadPatch(runId: string, changeId: string, fileName: string): Promise<void> {
+  const res = await globalThis.fetch(`/api/v1/runs/${runId}/changes/${changeId}/export.patch`, { headers: await authorizationHeaders() })
+  if (!res.ok) throw new Error(res.status === 422 ? 'This patch cannot be exported because it appears to contain a credential.' : 'The patch could not be downloaded.')
+  const url = URL.createObjectURL(await res.blob())
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+export type Publication = Schemas['PublicationView']
+
+export function usePublications(runId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: runKeys.part(runId, 'publications'),
+    enabled: enabled && runId !== '',
+    queryFn: () => unwrap(client.GET('/api/v1/runs/{id}/publications', { params: { path: { id: runId } } })),
+    // a publication runs in the background after approval, so look again while it is unfinished
+    refetchInterval: (q) => (q.state.data?.some((p) => p.status === 'PENDING' || p.status === 'PUSHED') ? 1500 : false),
+  })
+}
+
+/** Asks for approval to push a branch and open a draft pull request. Nothing leaves the platform until someone approves exactly this plan. */
+export function useRequestPublish(runId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => unwrap(client.POST('/api/v1/runs/{id}/publish', { params: { path: { id: runId } } })),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: runKeys.part(runId, 'approvals') })
+      void qc.invalidateQueries({ queryKey: runKeys.part(runId, 'publications') })
+    },
+  })
+}
+
+export function useRetryPublish(runId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => unwrap(client.POST('/api/v1/runs/{id}/publish/retry', { params: { path: { id: runId } } })),
+    onSuccess: () => qc.invalidateQueries({ queryKey: runKeys.part(runId, 'publications') }),
+  })
+}

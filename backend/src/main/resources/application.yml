@@ -1,0 +1,87 @@
+spring:
+  application:
+    name: devforge-backend
+  datasource:
+    url: ${DEVFORGE_DB_URL:jdbc:postgresql://localhost:5432/devforge}
+    username: ${DEVFORGE_DB_USER:devforge}
+    password: ${DEVFORGE_DB_PASSWORD:devforge}
+  flyway:
+    enabled: true
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  # 9090 rather than 8080: 8080 and 9090 are commonly taken by other local dev servers.
+  port: ${DEVFORGE_PORT:9090}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # metrics and prometheus need an admin (see SecurityConfig); health and info are public
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+devforge:
+  agent:
+    # simulated: the built-in simulation (no model). real: Claude through the Anthropic API using each user's own key.
+    mode: ${DEVFORGE_AGENT_MODE:simulated}
+    max-turns: 24            # model round trips per investigation
+    max-tool-calls: 40
+    max-run-tokens: 300000   # input + output tokens per investigation
+    step-timeout: PT8M
+    request-timeout: PT120S  # one model call
+    max-tool-output-chars: 8000
+  execution:
+    # Where private working copies live (never inside a user's checkout). Default: <java.io.tmpdir>/devforge-work
+    work-root: ${DEVFORGE_WORK_ROOT:}
+    # JDK/Node/build-tool installs the sandbox may see read-only, e.g. a version manager's install directories. Their bin/ is added to PATH.
+    # toolchain-mounts: [/opt/node-22, /opt/jdk-21]
+  oauth:
+    # The address people reach this application at. After signing in to a provider (single sign-on for Jira), the browser returns to
+    # <redirect-base>/api/v1/oauth/callback, which the provider must accept. Behind a reverse proxy set it to the public address.
+    redirect-base: ${DEVFORGE_OAUTH_REDIRECT_BASE:http://localhost:8080}
+    # Providers without automatic registration: an administrator registers an OAuth app once (callback address = <redirect-base>/api/v1/oauth/callback)
+    # and gives its client id and secret here (from the environment). Empty = single sign-on for that provider is off.
+    providers:
+      bitbucket-cloud:
+        client-id: ${DEVFORGE_OAUTH_BITBUCKET_CLIENT_ID:}
+        client-secret: ${DEVFORGE_OAUTH_BITBUCKET_CLIENT_SECRET:}
+      github:
+        client-id: ${DEVFORGE_OAUTH_GITHUB_CLIENT_ID:}
+        client-secret: ${DEVFORGE_OAUTH_GITHUB_CLIENT_SECRET:}
+        scopes: repo
+  workflow:
+    # finished runs older than this many days are deleted with everything they produced (0 keeps them)
+    retention-days: ${DEVFORGE_RETENTION_DAYS:0}
+    max-runs-per-user-per-day: ${DEVFORGE_MAX_RUNS_PER_USER_PER_DAY:100}
+    max-tokens-per-user-per-day: ${DEVFORGE_MAX_TOKENS_PER_USER_PER_DAY:5000000}
+  security:
+    oidc:
+      # Sign-in with your organisation's OpenID Connect provider. Empty issuer = off (then only the local profile's development sign-in works).
+      issuer-uri: ${DEVFORGE_OIDC_ISSUER_URI:}
+      audience: ${DEVFORGE_OIDC_AUDIENCE:}
+      client-id: ${DEVFORGE_OIDC_CLIENT_ID:}
+      admin-claim: ${DEVFORGE_OIDC_ADMIN_CLAIM:groups}
+      admin-value: ${DEVFORGE_OIDC_ADMIN_VALUE:}
+    # Vault master keys by version (base64, 32 bytes). Rotate by adding a new version and raising current-key-version.
+    current-key-version: 1
+    keys:
+      1: ${DEVFORGE_MASTER_KEY:}
+    dev-admins: ${DEVFORGE_DEV_ADMINS:}
+  providers:
+    # Inserted only on first boot (empty table); afterwards the table is edited from Admin settings.
+    seed:
+      - { kind: AI_PROVIDER, adapter-type: ANTHROPIC, display-name: "Claude (Anthropic)" }
+      - { kind: AI_PROVIDER, adapter-type: OPENAI, display-name: "OpenAI" }
+      - { kind: AI_PROVIDER, adapter-type: GEMINI, display-name: "Gemini (Google)" }
+      - { kind: TRACKER, adapter-type: JIRA_MCP, display-name: "Jira (via MCP)" }
+      - { kind: GIT_HOST, adapter-type: GITHUB, display-name: "GitHub" }
+      - { kind: GIT_HOST, adapter-type: BITBUCKET_CLOUD, display-name: "Bitbucket Cloud" }

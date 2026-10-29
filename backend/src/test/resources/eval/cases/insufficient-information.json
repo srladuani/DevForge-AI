@@ -1,0 +1,65 @@
+{
+ "id": "insufficient-information",
+ "description": "A vague ticket with nothing to find. The honest outcome is hypotheses and unknowns, never VERIFIED claims.",
+ "synthetic": true,
+ "ticket": "Something feels slow sometimes.",
+ "repos": [
+  {
+   "name": "api",
+   "role": "BACKEND",
+   "files": {
+    "src/main/java/com/acme/App.java": "package com.acme;\npublic class App { }\n"
+   }
+  }
+ ],
+ "transcript": [
+  {
+   "calls": [
+    {
+     "name": "repo_search_files",
+     "args": {
+      "repo": "api",
+      "keywords": [
+       "slow",
+       "performance"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "submit_findings",
+     "args": {
+      "summary": "The ticket does not identify a feature or symptom, and nothing in the repository clearly relates to it.",
+      "findings": [
+       {
+        "label": "UNKNOWN",
+        "text": "Which operation is slow",
+        "confidence": "LOW",
+        "evidence": []
+       },
+       {
+        "label": "HYPOTHESIS",
+        "text": "Possibly unrelated to this repository",
+        "confidence": "LOW",
+        "evidence": []
+       }
+      ],
+      "hypotheses": [],
+      "unknowns": [
+       "Which screen or endpoint is slow",
+       "How slow, and since when"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "expect": {
+  "rootFiles": [],
+  "citeRepos": [],
+  "maxVerified": 0
+ }
+}

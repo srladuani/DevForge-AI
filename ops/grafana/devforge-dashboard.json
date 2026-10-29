@@ -1,0 +1,26 @@
+{
+  "title": "DevForge AI",
+  "uid": "devforge-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    { "id": 1, "type": "timeseries", "title": "Runs by status", "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [ { "expr": "devforge_run_status", "legendFormat": "{{status}}" } ] },
+    { "id": 2, "type": "timeseries", "title": "Jobs waiting / oldest wait (s)", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [ { "expr": "devforge_jobs_queued", "legendFormat": "queued" }, { "expr": "devforge_jobs_oldest_queued_seconds", "legendFormat": "oldest wait (s)" } ] },
+    { "id": 3, "type": "timeseries", "title": "Average step duration (s)", "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "targets": [ { "expr": "sum by (step) (rate(devforge_step_duration_seconds_sum[5m])) / sum by (step) (rate(devforge_step_duration_seconds_count[5m]))", "legendFormat": "{{step}}" } ] },
+    { "id": 4, "type": "timeseries", "title": "Steps by outcome (per 5m)", "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [ { "expr": "sum by (outcome) (increase(devforge_step_duration_seconds_count[5m]))", "legendFormat": "{{outcome}}" } ] },
+    { "id": 5, "type": "timeseries", "title": "Real model tokens per hour", "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "targets": [ { "expr": "sum by (provider, direction) (increase(devforge_model_tokens_total{simulated=\"false\"}[1h]))", "legendFormat": "{{provider}} {{direction}}" } ] },
+    { "id": 6, "type": "timeseries", "title": "Publications", "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "targets": [ { "expr": "sum by (outcome, code) (increase(devforge_publications_total[1h]))", "legendFormat": "{{outcome}} {{code}}" } ] },
+    { "id": 7, "type": "stat", "title": "Sandbox available", "gridPos": { "x": 0, "y": 24, "w": 6, "h": 4 },
+      "targets": [ { "expr": "devforge_sandbox_available" } ] },
+    { "id": 8, "type": "timeseries", "title": "Sandbox runs by outcome (per 5m)", "gridPos": { "x": 6, "y": 24, "w": 18, "h": 8 },
+      "targets": [ { "expr": "sum by (outcome, network) (increase(devforge_sandbox_run_seconds_count[5m]))", "legendFormat": "{{outcome}} network={{network}}" } ] }
+  ]
+}

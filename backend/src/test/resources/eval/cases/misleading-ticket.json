@@ -1,0 +1,109 @@
+{
+ "id": "misleading-ticket",
+ "description": "The ticket blames PaymentGateway; the defect is in RefundCalculator. The agent must not endorse the reporter's guess.",
+ "synthetic": true,
+ "ticket": "PaymentGateway.java is broken: refunds come out too small. Please fix PaymentGateway.",
+ "repos": [
+  {
+   "name": "api",
+   "role": "BACKEND",
+   "files": {
+    "src/main/java/com/acme/pay/PaymentGateway.java": "package com.acme.pay;\n\npublic class PaymentGateway {\n    public void send(double amount) { /* forwards the amount unchanged */ }\n}\n",
+    "src/main/java/com/acme/pay/RefundCalculator.java": "package com.acme.pay;\n\npublic class RefundCalculator {\n    public double refund(double paid, double fee) {\n        // subtracts the fee twice\n        return paid - fee - fee;\n    }\n}\n"
+   }
+  }
+ ],
+ "transcript": [
+  {
+   "calls": [
+    {
+     "name": "repo_read",
+     "args": {
+      "repo": "api",
+      "path": "src/main/java/com/acme/pay/PaymentGateway.java",
+      "start_line": 1,
+      "end_line": 5
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "repo_search_files",
+     "args": {
+      "repo": "api",
+      "keywords": [
+       "refund",
+       "fee"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "repo_read",
+     "args": {
+      "repo": "api",
+      "path": "src/main/java/com/acme/pay/RefundCalculator.java",
+      "start_line": 1,
+      "end_line": 8
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "submit_findings",
+     "args": {
+      "summary": "PaymentGateway forwards the amount unchanged; the refund amount is computed in RefundCalculator, which subtracts the fee twice.",
+      "findings": [
+       {
+        "label": "VERIFIED",
+        "text": "RefundCalculator.refund subtracts the fee twice",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/pay/RefundCalculator.java",
+          "startLine": 5,
+          "endLine": 6
+         }
+        ]
+       },
+       {
+        "label": "VERIFIED",
+        "text": "PaymentGateway.send forwards the amount without modification, so it is not the cause",
+        "confidence": "MEDIUM",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/pay/PaymentGateway.java",
+          "startLine": 4,
+          "endLine": 4
+         }
+        ]
+       }
+      ],
+      "hypotheses": [],
+      "unknowns": [
+       "Whether fees are meant to be charged twice for some products is not known"
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "expect": {
+  "rootFiles": [
+   "api:src/main/java/com/acme/pay/RefundCalculator.java"
+  ],
+  "citeRepos": [
+   "api"
+  ],
+  "minVerified": 1
+ }
+}

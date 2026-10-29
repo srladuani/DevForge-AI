@@ -1,0 +1,11 @@
+// DevForge spike: resolve every resolvable configuration so a later --offline run has all artifacts.
+allprojects {
+    tasks.register('devforgeWarm') {
+        notCompatibleWithConfigurationCache('resolves configurations at execution time')
+        doLast {
+            configurations.matching { it.canBeResolved }.each { c ->
+                try { c.resolve() } catch (Throwable t) { println "WARM-SKIP ${c.name}: ${t.class.simpleName}" }
+            }
+        }
+    }
+}

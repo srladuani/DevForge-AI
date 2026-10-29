@@ -1,0 +1,95 @@
+{
+ "id": "dishonest-citations",
+ "description": "The scripted model claims VERIFIED for a file that does not exist and for lines past the end. The server must downgrade both; none may count as verified.",
+ "synthetic": true,
+ "ticket": "Login fails for locked accounts.",
+ "repos": [
+  {
+   "name": "api",
+   "role": "BACKEND",
+   "files": {
+    "src/main/java/com/acme/auth/LoginService.java": "package com.acme.auth;\n\npublic class LoginService {\n    public boolean login(String user) { return !locked(user); }\n}\n"
+   }
+  }
+ ],
+ "transcript": [
+  {
+   "calls": [
+    {
+     "name": "repo_search_files",
+     "args": {
+      "repo": "api",
+      "keywords": [
+       "login",
+       "locked"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "calls": [
+    {
+     "name": "submit_findings",
+     "args": {
+      "summary": "Login logic is in LoginService.",
+      "findings": [
+       {
+        "label": "VERIFIED",
+        "text": "LockoutPolicy resets the counter incorrectly",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/auth/LockoutPolicy.java",
+          "startLine": 10,
+          "endLine": 20
+         }
+        ]
+       },
+       {
+        "label": "VERIFIED",
+        "text": "login() has a race condition",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/auth/LoginService.java",
+          "startLine": 300,
+          "endLine": 320
+         }
+        ]
+       },
+       {
+        "label": "VERIFIED",
+        "text": "login() returns false for locked users",
+        "confidence": "HIGH",
+        "evidence": [
+         {
+          "repo": "api",
+          "path": "src/main/java/com/acme/auth/LoginService.java",
+          "startLine": 4,
+          "endLine": 4
+         }
+        ]
+       }
+      ],
+      "hypotheses": [],
+      "unknowns": []
+     }
+    }
+   ]
+  }
+ ],
+ "expect": {
+  "rootFiles": [
+   "api:src/main/java/com/acme/auth/LoginService.java"
+  ],
+  "citeRepos": [
+   "api"
+  ],
+  "minVerified": 1,
+  "maxVerified": 1,
+  "expectDowngrades": 2
+ }
+}

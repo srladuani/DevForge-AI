@@ -1,0 +1,7 @@
+# ADR-0009: Frontend stack
+**Status:** Proposed
+Vite + React 18/19 + TS strict. UI: **Tailwind + shadcn/ui** (owned accessible primitives on Radix; no heavy theme lock-in) over Ant Design (already used by ProgressiveBeef, but heavier, opinionated and would blur the product from the target). React Router (data routes), TanStack Query for server state, `openapi-typescript` + `openapi-fetch` for a typed client generated from the backend OpenAPI spec (contract check in CI). Live updates via **SSE** (`/runs/{id}/events`, `Last-Event-ID` resume) with polling fallback; chosen over WebSocket because traffic is server→client and SSE is simpler through proxies. Lint: ESLint + typescript-eslint; test: Vitest + RTL + MSW; E2E: Playwright.
+Revisit when bidirectional realtime (collaborative editing) is needed.
+
+### Implementation notes (M1)
+Vite 8, React 19, TypeScript pinned to **5.9** (`openapi-typescript` 7 requires TS 5), Tailwind 4 with design tokens (light/dark), React Router 8, TanStack Query 5, `openapi-fetch` with `fetch` resolved per call. Lint is **oxlint** (react, jsx-a11y, vitest rules; zero warnings enforced). Live events use a **fetch-based SSE reader** (not `EventSource`) so identity headers can be sent, with reconnect and `Last-Event-ID`-style resume. Tests: Vitest + Testing Library + MSW with fixtures typed against the generated schema, `vitest-axe` for accessibility, Playwright for the end-to-end flow.
